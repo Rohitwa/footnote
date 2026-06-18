@@ -1,0 +1,90 @@
+{% extends "app_base.html" %}
+{% block title %}Foothold · Leads{% endblock %}
+
+{% block style %}
+.l-search {
+  margin-top:16px; background:var(--card); border:1px solid var(--rule); border-radius:14px;
+  padding:12px 16px; font-size:14.5px; display:flex; gap:10px; align-items:center;
+}
+.l-search input { border:0; outline:none; flex:1; background:transparent; }
+.l-search .glyph { color:var(--ink3); }
+.lead {
+  background:var(--card); border:1px solid var(--rule); border-radius:16px;
+  padding:16px 18px; margin-bottom:10px; display:flex; align-items:center; gap:14px;
+}
+.lead .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.dot.warm { background:var(--amber); } .dot.hot { background:var(--red); }
+.dot.new { background:#d4cfc8; } .dot.cold { background:var(--blue); }
+.lead .nm { flex:1; min-width:0; }
+.lead .nm .n { font-size:16px; font-weight:700; letter-spacing:-.01em; }
+.lead .nm .n .ai { font-size:10px; font-weight:800; color:var(--amber); letter-spacing:.04em; vertical-align:2px; }
+.lead .nm .why {
+  font-size:12.5px; color:var(--ink3); margin-top:2px; line-height:1.35;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.lead .pat { font-family:var(--mono); font-size:13px; font-weight:600; color:var(--red); white-space:nowrap; }
+.lead .pat.pos { color:var(--green); }
+.lead .pat.na { color:var(--ink3); }
+
+/* funnel stage + momentum */
+.lead.cold-alert { border-left:3px solid var(--red); }
+.lead .meta-r { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+.stage-chip {
+  font-size:9.5px; font-weight:800; letter-spacing:.06em; padding:3px 8px;
+  border-radius:999px; background:var(--paper); color:var(--ink3); border:1px solid var(--rule);
+}
+.stage-chip.contacted { background:var(--amber-soft); color:var(--amber); border-color:#f0d9bd; }
+.stage-chip.meeting   { background:#e7effa; color:#2c5d9c; border-color:#cdddf2; }
+.stage-chip.poc       { background:var(--green-soft); color:var(--green); border-color:#cbe7d3; }
+.stage-chip.won       { background:var(--ink); color:#fff; border-color:var(--ink); }
+.glyph { font-size:11px; font-weight:800; }
+.glyph.up { color:var(--green); } .glyph.steady { color:var(--amber); } .glyph.stale { color:var(--ink3); }
+.score { font-family:var(--mono); font-size:15px; font-weight:700; line-height:1; }
+.score.hi { color:var(--green); } .score.mid { color:var(--amber); } .score.lo { color:var(--ink3); }
+.score small { font-size:9px; color:var(--ink3); font-weight:600; }
+.cold-tag { font-size:9px; font-weight:800; color:var(--red); letter-spacing:.05em; }
+{% endblock %}
+
+{% block content %}
+<div class="h-page">Leads</div>
+
+<form class="l-search" method="get" action="/search">
+  <span class="glyph">⌕</span>
+  <input id="filter" name="q" placeholder="Filter {{ counts.all }} companies — Enter searches everything" autocomplete="off">
+</form>
+
+<div class="seg">
+  <a class="s {% if t == 'pipeline' %}on{% endif %}" href="/leads?t=pipeline">Pipeline {{ pipeline_n }}</a>
+  <a class="s {% if t == 'hot' %}on{% endif %}" href="/leads?t=hot">Hot {{ counts.get('hot', 0) }}</a>
+  <a class="s {% if t == 'all' or not t %}on{% endif %}" href="/leads">All {{ counts.all }}</a>
+</div>
+
+{% for r in rows %}
+<a class="lead {% if r.going_cold %}cold-alert{% endif %}" href="/leads/{{ r.id }}" data-name="{{ (r.name ~ ' ' ~ (r.ticker or '')) | lower }}">
+  <span class="dot {{ r.temperature }}"></span>
+  <span class="nm">
+    <span class="n">{{ r.name }}</span>
+    <span class="why">{% if r.going_cold %}<span class="cold-tag">GOING COLD · </span>{% endif %}{{ r.sector or 'Lead' }} · {% if r.score is defined and r.score >= 70 %}strong lead{% elif r.score is defined and r.score >= 40 %}worth pursuing{% else %}early{% endif %}</span>
+  </span>
+  <span class="meta-r">
+    <span class="score {% if r.score >= 70 %}hi{% elif r.score >= 40 %}mid{% else %}lo{% endif %}">{{ r.score }}<small>/100</small></span>
+    {% if r.status != 'new' %}<span class="stage-chip {{ r.status }}">{{ r.status | upper }}</span>{% endif %}
+  </span>
+</a>
+{% endfor %}
+
+{% if not rows %}
+<div class="quiet">Nothing here yet.</div>
+{% endif %}
+{% endblock %}
+
+{% block script %}
+<script>
+document.getElementById('filter').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  document.querySelectorAll('.lead').forEach(el => {
+    el.style.display = !q || el.dataset.name.includes(q) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

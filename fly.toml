@@ -1,0 +1,26 @@
+# Foothold on Fly.io — Mumbai, next to Supabase (aws ap-south-1)
+app = "foothold-yantrai"
+primary_region = "bom"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8300
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8300
+    path = "/api/v1/health"
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "45s"
