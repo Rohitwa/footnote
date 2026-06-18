@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Foothold">
+  <rect width="512" height="512" rx="92" fill="#FFFFFF"/>
+  <g fill="none" stroke-width="44" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M161 318 L256 240 L351 318" stroke="#161514"/>
+    <path d="M161 240 L256 162 L351 240" stroke="#BA7517"/>
+  </g>
+</svg>

@@ -1,0 +1,804 @@
+{% extends "app_base.html" %}
+{% block title %}{{ co.name }} · Foothold{% endblock %}
+
+{% block style %}
+.d-back { font-size:13px; color:var(--ink3); font-weight:700; margin-top:18px; display:inline-block; }
+.d-name { font-size:27px; font-weight:800; letter-spacing:-.03em; margin-top:10px; line-height:1.1; }
+.d-hero {
+  margin-top:18px; background:var(--card); border:1px solid var(--rule); border-radius:18px;
+  padding:18px; display:flex; justify-content:space-between; align-items:center; gap:12px;
+}
+.d-hero .k { font-size:11px; font-weight:700; color:var(--ink3); letter-spacing:.08em; }
+.d-hero .v { font-family:var(--mono); font-size:21px; font-weight:600; margin-top:4px; }
+.d-hero .v.neg { color:var(--red); } .d-hero .v.pos { color:var(--green); }
+.d-hero .score-tag { font-size:10.5px; font-weight:700; margin-top:3px; }
+.temp-pick { display:flex; gap:6px; }
+.temp-pick button {
+  width:38px; height:38px; border-radius:50%; border:1.5px solid var(--rule);
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+  background:var(--card); cursor:pointer;
+}
+.temp-pick button.on { border-color:var(--amber); background:var(--amber-soft); }
+
+/* cold flag */
+.cold-flag { display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.04em;
+  color:var(--red); background:var(--red-soft); border-radius:8px; padding:3px 9px; margin-top:10px; }
+
+/* funnel stepper */
+.stepper { display:flex; gap:6px; margin-top:14px; }
+.stepper button {
+  flex:1; font-size:11px; font-weight:800; letter-spacing:.04em; padding:9px 0;
+  border-radius:11px; border:1px solid var(--rule); background:var(--card);
+  color:var(--ink3); cursor:pointer;
+}
+.stepper button.done { background:var(--paper); color:var(--ink2); border-style:dashed; }
+.stepper button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+.stepper button.won-on { background:var(--green); color:#fff; border-color:var(--green); }
+
+.d-tabs {
+  display:flex; gap:4px; margin:22px 0 18px; background:var(--card);
+  border:1px solid var(--rule); border-radius:14px; padding:4px; position:sticky; top:8px; z-index:30;
+}
+@media (min-width:768px) { .d-tabs { top:64px; } }
+.d-tabs button {
+  flex:1; text-align:center; font-size:13px; font-weight:700; padding:10px 0;
+  border-radius:11px; color:var(--ink3); border:0; background:none; cursor:pointer;
+  font-family:inherit;
+}
+.d-tabs button.on { background:var(--ink); color:#fff; }
+.tabpane[hidden] { display:none; }
+
+/* ── on-device AI setup banner ── */
+.ai-setup { background:var(--card); border:1px solid var(--amber); border-radius:14px; padding:13px 15px; margin-bottom:14px; }
+.ai-setup .txt b { font-size:13.5px; } .ai-setup .txt small { display:block; color:var(--ink3); font-size:11.5px; margin-top:2px; line-height:1.4; }
+.ai-setup button { margin-top:10px; font-size:12px; font-weight:800; border-radius:9px; padding:8px 16px; cursor:pointer; border:1px solid var(--ink); background:var(--ink); color:#fff; }
+.ai-setup button:disabled { opacity:.6; cursor:default; }
+.ai-setup .prog { margin-top:10px; height:6px; background:var(--paper); border-radius:99px; overflow:hidden; }
+.ai-setup .prog .bar { height:100%; width:0; background:var(--amber); transition:width .25s; }
+
+/* ── AI recommendation (pinned) ── */
+.rec { background:var(--ink); border-radius:18px; padding:18px; color:#fff; margin-bottom:14px; }
+.rec .hd { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+.rec .hd h3 { font-size:10.5px; font-weight:800; letter-spacing:.12em; color:var(--amber); }
+.rec .hd button { background:none; border:0; color:#b8b3ac; font-size:11px; font-weight:700; cursor:pointer; }
+.move { padding:12px 0; border-bottom:1px solid #33312e; display:flex; gap:12px; align-items:flex-start; }
+.move:last-child { border-bottom:0; padding-bottom:2px; }
+.move .ix { width:20px; height:20px; border-radius:50%; background:var(--amber); color:#fff;
+  font-family:var(--mono); font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+.move .bd { flex:1; min-width:0; }
+.move .ac { font-size:14px; font-weight:700; line-height:1.35; }
+.move .wy { font-size:12px; color:#b8b3ac; margin-top:4px; line-height:1.45; }
+.move .gn { font-size:10px; color:var(--amber); margin-top:5px; font-weight:700; letter-spacing:.03em; }
+.move .acts { display:flex; flex-direction:column; gap:6px; }
+.move .acts button {
+  font-size:10.5px; font-weight:800; border-radius:8px; padding:6px 10px; cursor:pointer;
+  border:1px solid #44413d; background:transparent; color:#dcd8d2; white-space:nowrap;
+}
+.move .acts button.task { background:var(--amber); border-color:var(--amber); color:#fff; }
+.rec .thinking { font-size:13px; color:#b8b3ac; padding:8px 0 4px; }
+.rec .hd button { background:none; border:0; color:#b8b3ac; font-size:13px; font-weight:700; cursor:pointer; }
+.rec-act { color:#fff; font-size:16px; font-weight:600; line-height:1.3; margin:4px 0 14px; }
+.rec-go-row { display:flex; gap:8px; }
+.rec-go { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; background:#1D9E75;
+  color:#fff; border:0; border-radius:12px; padding:13px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+.rec-go .g { font-size:16px; }
+.rec-snooze { background:#33312e; color:#dcd8d2; border:0; border-radius:12px; padding:0 18px; font-size:13px; font-weight:700; cursor:pointer; }
+.rec-why { margin-top:11px; } .rec-why summary { font-size:11px; color:#b8b3ac; cursor:pointer; list-style:none; font-weight:700; letter-spacing:.04em; }
+.rec-why summary::after { content:" ⌄"; } .rec-why[open] summary::after { content:" ⌃"; }
+.rec-why p { font-size:12px; color:#b8b3ac; line-height:1.45; margin:6px 0 0; }
+.rec-more { margin-top:11px; border-top:1px solid #33312e; padding-top:9px; }
+.rec-more summary { font-size:11px; color:#b8b3ac; cursor:pointer; font-weight:700; letter-spacing:.04em; }
+.move-mini { display:flex; align-items:center; gap:8px; padding:8px 0 0; }
+.move-mini span { flex:1; color:#dcd8d2; font-size:12.5px; line-height:1.35; }
+.move-mini button { background:transparent; border:1px solid #44413d; color:#dcd8d2; font-size:10px; font-weight:800; border-radius:7px; padding:5px 9px; cursor:pointer; white-space:nowrap; }
+
+/* contact editor */
+.contact-ed { margin-bottom:14px; background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:11px 14px; }
+.contact-ed summary { font-size:12.5px; font-weight:700; color:var(--ink2); cursor:pointer; list-style:none; }
+.contact-ed summary .ci { margin-right:6px; }
+.contact-ed form { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+.import-contact { font-size:12.5px; font-weight:700; border:1px solid var(--rule); background:var(--paper);
+  color:var(--ink2); border-radius:9px; padding:9px; cursor:pointer; }
+.rec-cta {
+  width:100%; background:var(--ink); border-radius:18px; padding:18px; color:#fff;
+  border:0; cursor:pointer; text-align:left; font-size:15px; font-weight:700; margin-bottom:14px;
+}
+.rec-cta small { display:block; font-weight:400; font-size:12px; color:#b8b3ac; margin-top:3px; }
+.rec-cta .sp { color:var(--amber); }
+
+/* ── action bar ── */
+.actbar { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-bottom:14px; }
+.actbar button {
+  display:flex; flex-direction:column; align-items:center; gap:4px; padding:11px 0;
+  border-radius:13px; border:1px solid var(--rule); background:var(--card);
+  font-size:11px; font-weight:700; color:var(--ink2); cursor:pointer;
+}
+.actbar button .g { font-size:17px; }
+.actbar button.on { border-color:var(--ink); background:var(--ink); color:#fff; }
+.composer { background:var(--card); border:1px solid var(--rule); border-radius:14px;
+  padding:14px; margin-bottom:14px; display:none; }
+.composer.open { display:block; }
+.composer .dir { display:flex; gap:6px; margin-bottom:8px; }
+.composer .dir button { flex:1; font-size:11px; font-weight:700; padding:7px 0; border-radius:9px;
+  border:1px solid var(--rule); background:var(--paper); color:var(--ink3); cursor:pointer; }
+.composer .dir button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+
+/* ── interaction diary ── */
+.diary-entry { display:flex; gap:12px; margin-bottom:14px; }
+.diary-entry .rail { display:flex; flex-direction:column; align-items:center; }
+.diary-entry .dot { width:30px; height:30px; border-radius:50%; background:var(--paper);
+  border:1px solid var(--rule); display:flex; align-items:center; justify-content:center;
+  font-size:14px; flex-shrink:0; }
+.diary-entry .line { flex:1; width:1.5px; background:var(--rule); margin-top:4px; min-height:8px; }
+.diary-entry:last-child .line { display:none; }
+.diary-entry .bd { flex:1; min-width:0; padding-bottom:2px; }
+.diary-entry .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.diary-entry .tt { font-size:13.5px; font-weight:700; }
+.diary-entry .tt b { font-weight:800; }
+.delta { font-size:11px; font-family:var(--mono); font-weight:700; padding:2px 7px; border-radius:8px;
+  white-space:nowrap; background:var(--paper); color:var(--ink3); }
+.delta.pull { background:#e7f3e2; color:var(--green); }
+.diary-entry .dt { font-size:13px; color:var(--ink2); margin-top:3px; line-height:1.45; overflow-wrap:anywhere; }
+.diary-entry .mt { font-size:10.5px; color:var(--ink3); margin-top:3px; display:flex; align-items:center; gap:8px; }
+.diary-entry .d-tools { margin-left:auto; display:flex; gap:6px; opacity:0; transition:opacity .12s; }
+.diary-entry:hover .d-tools, .diary-entry.editing .d-tools { opacity:1; }
+.diary-entry .d-tools button { background:none; border:0; color:var(--ink3); font-size:12px; cursor:pointer; padding:2px 4px; }
+.diary-entry .d-tools button:hover { color:var(--ink); }
+.diary-entry .dt.edit { display:none; }
+.diary-entry .dt-box { display:none; margin-top:4px; }
+.diary-entry.editing .dt-box { display:block; }
+.diary-entry .dt-box textarea { width:100%; box-sizing:border-box; font:inherit; font-size:13px;
+  border:1px solid var(--rule); border-radius:9px; padding:8px 10px; resize:vertical; min-height:46px; }
+.diary-entry .dt-box .row { display:flex; gap:6px; margin-top:6px; }
+.diary-entry .dt-box button { font-size:11px; font-weight:700; border-radius:8px; padding:5px 12px; cursor:pointer; border:1px solid var(--rule); background:var(--paper); color:var(--ink2); }
+.diary-entry .dt-box button.save { background:var(--ink); color:#fff; border-color:var(--ink); }
+
+/* ── upcoming tasks (compact) ── */
+.task { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--rule); }
+.task:last-child { border-bottom:0; }
+.task .tx { flex:1; min-width:0; } .task .tx .a { font-size:13.5px; font-weight:600; }
+.task .tx .c { font-size:11px; color:var(--ink3); } .task.dim { opacity:.5; }
+.task .mini { background:none; border:0; color:var(--ink3); font-size:13px; cursor:pointer; }
+
+/* capture bar styles live in app_base (the bar is now app-wide) */
+
+/* ── background (dossier) ── */
+.bg-empty { background:var(--paper); border:1px dashed var(--rule); border-radius:14px;
+  padding:18px; text-align:center; margin-bottom:14px; }
+.bg-empty .t { font-size:14px; font-weight:700; color:var(--ink2); }
+.bg-empty .s { font-size:12.5px; color:var(--ink3); margin-top:5px; line-height:1.45; }
+.story .lbl { font-size:10.5px; font-weight:800; letter-spacing:.1em; color:var(--amber); }
+.story p { font-size:14.5px; line-height:1.55; margin-top:7px; color:var(--ink2); overflow-wrap:anywhere; }
+.vert { display:flex; align-items:center; gap:12px; }
+.vert .bar { width:4px; height:34px; border-radius:99px; background:var(--green); flex-shrink:0; }
+.vert .bar.loss { background:var(--red); } .vert .bar.declining { background:var(--amber); }
+.vert .bar.killed { background:var(--ink3); }
+.vert .vn { flex:1; font-size:14.5px; font-weight:700; min-width:0; }
+.vert .vn small { display:block; font-weight:500; color:var(--ink3); font-size:11.5px; margin-top:1px; }
+.vert .vr { font-family:var(--mono); font-size:12.5px; color:var(--ink2); white-space:nowrap; }
+.sig { padding:12px 0; border-bottom:1px solid var(--rule); }
+.sig:last-child { border-bottom:0; }
+.sig .d { font-family:var(--mono); font-size:10.5px; color:var(--ink3); }
+.sig .h { font-size:13.5px; font-weight:600; line-height:1.4; margin-top:3px; }
+.fin { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.fin .cell { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:14px; }
+.fin .k { font-size:10px; font-weight:700; color:var(--ink3); letter-spacing:.08em; text-transform:uppercase; }
+.fin .v { font-size:14px; font-weight:600; margin-top:5px; line-height:1.35; font-family:var(--mono); }
+.qtr-scroll { overflow-x:auto; margin-top:14px; border:1px solid var(--rule); border-radius:14px; background:var(--card); }
+table.qtr { border-collapse:collapse; min-width:540px; width:100%; font-size:12.5px; }
+table.qtr th { text-align:left; font-size:10px; letter-spacing:.06em; color:var(--ink3); text-transform:uppercase; padding:11px 12px; border-bottom:1px solid var(--rule); }
+table.qtr td { padding:9px 12px; border-bottom:1px solid var(--rule); font-family:var(--mono); font-size:11.5px; white-space:nowrap; }
+table.qtr tr:last-child td { border-bottom:0; }
+.chart-wrap { position:relative; height:250px; margin-top:8px; }
+.art { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--rule); }
+.art:last-child { border-bottom:0; }
+.art .ic { width:34px; height:34px; border-radius:9px; background:var(--paper); border:1px solid var(--rule);
+  display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.art .tx { flex:1; min-width:0; } .art .tt { font-size:14px; font-weight:700; }
+.art .tt a { text-decoration:underline; text-decoration-color:var(--rule); }
+.art .ss { font-size:11.5px; color:var(--ink3); margin-top:2px; }
+.art .sent { font-size:9.5px; font-weight:800; color:var(--green); letter-spacing:.05em; white-space:nowrap; }
+.art-form details summary { font-size:12.5px; color:var(--amber); font-weight:700; cursor:pointer; list-style:none; margin-top:6px; }
+.art-form .row2 { display:flex; gap:8px; } .art-form .row2 .in { flex:1; }
+.air-card { background:var(--ink); border-radius:16px; color:#fff; border:0; width:100%;
+  padding:18px; text-align:left; cursor:pointer; font-size:15px; font-weight:700; }
+.air-card .sp { color:var(--amber); }
+.air-card small { display:block; font-weight:400; font-size:12px; color:#b8b3ac; margin-top:4px; }
+.air-card.running { background:var(--amber-soft); color:var(--amber); border:1px solid #f0d9bd; pointer-events:none; }
+.air-card.failed { background:var(--red-soft); color:var(--red); border:1px solid #efc4c1; }
+details.rlog { background:var(--card); border:1px solid var(--rule); border-radius:16px; margin-bottom:10px; overflow:hidden; }
+details.rlog summary { padding:15px 18px; font-size:14px; font-weight:700; cursor:pointer; list-style:none; }
+details.rlog summary::after { content:"›"; float:right; color:var(--ink3); transform:rotate(90deg); }
+details.rlog[open] summary::after { transform:rotate(-90deg); }
+.rlog-body { padding:0 18px 16px; font-size:13.5px; line-height:1.6; color:var(--ink2); overflow-x:auto; }
+.rlog-body h2 { font-size:14px; margin:14px 0 6px; color:var(--ink); }
+.rlog-body h3 { font-size:13px; margin:12px 0 5px; color:var(--ink); }
+.rlog-body table { border-collapse:collapse; font-size:11.5px; margin:8px 0; }
+.rlog-body th, .rlog-body td { border:1px solid var(--rule); padding:5px 8px; text-align:left; }
+.rlog-body b, .rlog-body strong { color:var(--ink); }
+{% endblock %}
+
+{% block content %}
+<a class="d-back" href="/leads">‹ Leads</a>
+<div class="d-name">{{ co.name }}</div>
+<div class="sub">{{ co.sector }}{% if co.hq_city %} · {{ co.hq_city }}{% endif %}{% if co.dm_name %} · {{ co.dm_name }}{% endif %}</div>
+
+<div class="d-hero">
+  <div><div class="k">SCORE</div>
+    <div class="v" style="color:{% if rk.score and rk.score >= 70 %}var(--green){% elif rk.score and rk.score >= 40 %}var(--amber){% else %}var(--ink3){% endif %};">
+      {{ rk.score if rk.score is defined else '—' }}<span style="font-size:11px;color:var(--ink3);">/100</span></div>
+    {% if rk.score is defined %}<div class="score-tag" style="color:{% if rk.score >= 70 %}var(--green){% elif rk.score >= 40 %}var(--amber){% else %}var(--ink3){% endif %};">{% if rk.score >= 70 %}strong — push now{% elif rk.score >= 40 %}warming{% else %}cold{% endif %}</div>{% endif %}</div>
+  <div><div class="k">FY26 PAT</div>
+    <div class="v {% if co.fy26_pat and '-' in co.fy26_pat %}neg{% elif co.fy26_pat %}pos{% endif %}" style="font-size:15px;">{{ co.fy26_pat or '—' }}</div></div>
+  <div class="temp-pick">
+    <button data-temp="cold" class="{% if co.temperature == 'cold' %}on{% endif %}" title="Cold">❄️</button>
+    <button data-temp="warm" class="{% if co.temperature == 'warm' %}on{% endif %}" title="Warm">🌤</button>
+    <button data-temp="hot"  class="{% if co.temperature == 'hot'  %}on{% endif %}" title="Hot">🔥</button>
+  </div>
+</div>
+{% if rk.going_cold %}<span class="cold-flag">🔥 GOING COLD — re-engage</span>{% endif %}
+
+<div class="stepper">
+  {% for s in ['contacted', 'meeting', 'poc', 'won'] %}
+  <button data-stage="{{ s }}"
+    class="{% if co.status == s %}{% if s == 'won' %}won-on{% else %}on{% endif %}{% elif STAGE_ORDER.get(co.status, 1) > STAGE_ORDER.get(s, 1) or co.status == 'won' %}done{% endif %}">
+    {{ s | upper }}</button>
+  {% endfor %}
+</div>
+
+<div class="d-tabs">
+  <button type="button" class="{% if tab == 'memory' %}on{% endif %}" data-tab="memory">Memory</button>
+  <button type="button" class="{% if tab == 'background' %}on{% endif %}" data-tab="background">Background</button>
+</div>
+
+<div class="tabpane" data-pane="memory" {% if tab != 'memory' %}hidden{% endif %}>
+  {# ── on-device AI setup (only shown inside the app when models missing) ── #}
+  <div id="ai-setup" class="ai-setup" hidden>
+    <div class="txt"><b>Enable on-device AI</b><small id="ai-setup-sub">Private semantic memory + offline answers · large download · Wi-Fi recommended</small></div>
+    <button id="ai-setup-btn">Download</button>
+    <div id="ai-setup-prog" class="prog" hidden><div class="bar" id="ai-setup-bar"></div></div>
+  </div>
+
+  {# ── AI recommendation — one move, the button IS the action ── #}
+  {% if suggestions %}
+  {% set top = suggestions[0] %}
+  <div class="rec" id="moves">
+    <div class="hd"><h3>✦ NEXT BEST MOVE</h3><button id="moves-refresh">↻</button></div>
+    <p class="rec-act">{{ top.action }}</p>
+    <div class="rec-go-row">
+      <button class="rec-go" data-sid="{{ top.id }}" data-channel="{{ top.channel }}">
+        <span class="g">{% if top.channel == 'call' %}📞{% elif top.channel == 'email' %}✉{% elif top.channel == 'meeting' %}🤝{% else %}💬{% endif %}</span>
+        <span class="lbl">{% if top.channel == 'call' %}Call{% elif top.channel == 'email' %}Email{% elif top.channel == 'meeting' %}Log meeting{% else %}WhatsApp{% endif %}{% if co.dm_name %} {{ co.dm_name.split()[0] }}{% endif %}</span>
+      </button>
+      <button class="rec-snooze" data-sid="{{ top.id }}" title="Not now">Later</button>
+    </div>
+    {% if top.why %}<details class="rec-why"><summary>why</summary><p>{{ top.why }}{% if top.generates %} → {{ top.generates }}{% endif %}</p></details>{% endif %}
+    {% if suggestions|length > 1 %}
+    <details class="rec-more">
+      <summary>{{ suggestions|length - 1 }} more move{{ 's' if suggestions|length > 2 else '' }}</summary>
+      {% for s in suggestions[1:] %}
+      <div class="move-mini" data-sid="{{ s.id }}"><span>{{ s.action }}</span><button data-task title="Add as task">+ task</button></div>
+      {% endfor %}
+    </details>
+    {% endif %}
+  </div>
+  {% elif co.suggest_status in ('running', 'requested') %}
+  <div class="rec" id="moves" data-poll="1">
+    <div class="hd"><h3>✦ AI RECOMMENDATION</h3></div>
+    <div class="thinking">◐ Reading the whole relationship — stage, touches, work, risks… ~2 min.</div>
+  </div>
+  {% else %}
+  <button class="rec-cta" id="moves-cta">
+    <span class="sp">✦</span> Recommend the next move
+    <small>AI reads the whole thread — touches, work sent, risks — and proposes the move most likely to pull a reply{% if co.suggest_status == 'failed' %} · last run failed, tap to retry{% endif %}</small>
+  </button>
+  {% endif %}
+
+  {# ── action bar ── #}
+  <div class="actbar">
+    <button data-act="call"><span class="g">📞</span>Call</button>
+    <button data-act="whatsapp"><span class="g">💬</span>WhatsApp</button>
+    <button data-act="meeting"><span class="g">🤝</span>Meeting</button>
+    <button data-act="email"><span class="g">✉</span>Email</button>
+  </div>
+
+  {# ── contact channels (targets for the rec + action buttons) ── #}
+  <details class="contact-ed" id="contact-ed">
+    <summary><span class="ci">☎</span> Contact{% if not (co.dm_phone or co.dm_email or co.dm_whatsapp) %} — add a number to enable one-tap{% endif %}</summary>
+    <form id="contact-form" method="post" action="/targets/{{ co.id }}/contact">
+      <button type="button" id="import-contact" class="import-contact" hidden>📇 Import from phone</button>
+      <input class="in" name="dm_name"     placeholder="Name"            value="{{ co.dm_name or '' }}">
+      <input class="in" name="dm_phone"    placeholder="Phone (call)"    value="{{ co.dm_phone or '' }}" inputmode="tel">
+      <input class="in" name="dm_whatsapp" placeholder="WhatsApp (intl digits, e.g. 9198…)" value="{{ co.dm_whatsapp or '' }}" inputmode="tel">
+      <input class="in" name="dm_email"    placeholder="Email"           value="{{ co.dm_email or '' }}" inputmode="email">
+      <button class="btn-primary">Save contact</button>
+    </form>
+  </details>
+
+  {# ── upcoming tasks ── #}
+  {% if followups %}
+  <div class="sec-head"><h2>NEXT</h2></div>
+  <div class="card">
+    {% for f in followups %}
+    <div class="task" data-fid="{{ f.id }}">
+      <input type="checkbox" class="ring">
+      <div class="tx"><div class="a">{{ f.action_text }}</div><div class="c">{{ f.due_date }}</div></div>
+      <button class="mini" data-del>✕</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ── interaction diary ── #}
+  <div class="sec-head"><h2>History</h2></div>
+  {% if diary %}
+  <div class="card">
+    {% for e in diary %}
+    <div class="diary-entry" data-src="{{ e.source }}" data-ref="{{ e.ref_id }}">
+      <div class="rail"><div class="dot">{{ e.icon }}</div><div class="line"></div></div>
+      <div class="bd">
+        <div class="top">
+          <span class="tt">{{ e.title }}{% if e.with_name %} · <b>{{ e.with_name }}</b>{% endif %}</span>
+          {% if e.delta == 5 %}<span class="delta pull">↑ they engaged</span>{% endif %}
+        </div>
+        <div class="dt">{{ e.detail }}</div>
+        <div class="mt">{{ e.ts[:10] }} · {{ e.source }}
+          <span class="d-tools">
+            <button class="d-edit" title="Edit" aria-label="Edit">✎</button>
+            <button class="d-del" title="Delete" aria-label="Delete">✕</button>
+          </span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="quiet">No interactions yet — log the first touch with the buttons above.</div>
+  {% endif %}
+
+</div>
+<div class="tabpane" data-pane="background" {% if tab != 'background' %}hidden{% endif %}>
+  {% set has_case = co.leak or co.lever or co.spine %}
+  {% set has_numbers = co.fy26_pat or co.fy26_yoy or co.latest_qtr or co.stock_drawdown or quarterly %}
+  {% if not has_case and not has_numbers %}
+  <div class="bg-empty">
+    <div class="t">This lead isn't fully researched yet</div>
+    <div class="s">Its case, financials and signals haven't been filled in. Run AI research below to populate them.</div>
+  </div>
+  {% endif %}
+
+  {% if co.leak %}<div class="card story"><div class="lbl">Their problem</div><p>{{ co.leak }}</p></div>{% endif %}
+  {% if co.lever %}<div class="card story"><div class="lbl">Our angle</div><p>{{ co.lever }}</p></div>{% endif %}
+  {% if co.spine %}<div class="card story"><div class="lbl">In one line</div><p>{{ co.spine }}</p></div>{% endif %}
+
+  {% if has_numbers %}
+  <div class="sec-head"><h2>NUMBERS</h2></div>
+  <div class="fin">
+    <div class="cell"><div class="k">FY26 PAT</div><div class="v">{{ co.fy26_pat or '—' }}</div></div>
+    <div class="cell"><div class="k">YoY</div><div class="v">{{ co.fy26_yoy or '—' }}</div></div>
+    <div class="cell"><div class="k">Latest quarter</div><div class="v" style="font-size:12px;">{{ co.latest_qtr or '—' }}</div></div>
+    <div class="cell"><div class="k">Stock drawdown</div><div class="v" style="font-size:12px;">{{ co.stock_drawdown or '—' }}</div></div>
+  </div>
+  {% endif %}
+  {% if quarterly %}
+  <div class="qtr-scroll">
+  <table class="qtr">
+    <thead><tr><th>Quarter</th><th>Revenue</th><th>EBITDA</th><th>%</th><th>PAT</th></tr></thead>
+    <tbody>
+    {% for q in quarterly %}
+      <tr><td>{{ q.quarter_label }}</td><td>{{ q.revenue or '—' }}</td><td>{{ q.ebitda or '—' }}</td><td>{{ q.ebitda_pct or '—' }}</td><td>{{ q.pat or '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% if group_headcount %}
+  <div class="sec-head"><h2>PEOPLE</h2></div>
+  <div class="card"><div class="chart-wrap"><canvas id="hc-chart"></canvas></div></div>
+  <script id="hc-json" type="application/json">{{ group_headcount | tojson }}</script>
+  {% endif %}
+
+  {% if verticals %}
+  <div class="sec-head"><h2>BUSINESS</h2></div>
+  {% for v in verticals %}
+  <div class="card vert">
+    <span class="bar {{ v.status or '' }}"></span>
+    <span class="vn">{{ v.name | truncate(38) }}{% if v.note %}<small>{{ v.note | truncate(60) }}</small>{% endif %}</span>
+    <span class="vr">{{ (v.revenue or '—') | truncate(22) }}</span>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if signals %}
+  <div class="sec-head"><h2>LATEST SIGNALS</h2></div>
+  <div class="card">
+    {% for s in signals[:5] %}
+    <div class="sig"><div class="d">{{ s.event_date }}</div><div class="h">{{ s.headline }}</div></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="sec-head"><h2>RESEARCH</h2></div>
+  {% if co.research_status == 'researching' or co.research_status == 'requested' %}
+  <button class="air-card running" id="air-btn" data-company="{{ co.id }}">
+    ◐ Researching… <small>Claude is reading filings & public data — ~5 min. You can leave.</small>
+  </button>
+  {% elif co.research_status == 'failed' %}
+  <button class="air-card failed" id="air-btn" data-company="{{ co.id }}">
+    ✦ Research failed — tap to retry <small>{{ co.research_error | truncate(90) }}</small>
+  </button>
+  {% else %}
+  <button class="air-card" id="air-btn" data-company="{{ co.id }}">
+    <span class="sp">✦</span> {% if verticals %}Fill missing data{% else %}Research this company{% endif %}
+    <small>Claude researches the case, financials, rivals & signals · ~5 min · fills only empty fields — never overwrites existing data</small>
+  </button>
+  {% endif %}
+  <div style="margin-top:12px;">
+  {% for r in research_logs %}
+  <details class="rlog" {% if loop.first %}open{% endif %}>
+    <summary>{{ r.title }}</summary>
+    <div class="rlog-body">{{ r.content_html | safe }}</div>
+  </details>
+  {% else %}<div class="quiet">No research entries yet — the button above writes the first one.</div>{% endfor %}
+  </div>
+
+  <div class="sec-head"><h2>DOCUMENTS</h2></div>
+  <div class="card">
+    {% for a in artifacts %}
+    <div class="art">
+      <span class="ic">{% if a.kind == 'deck' %}▦{% elif a.kind == 'pdf' %}▤{% elif a.kind == 'dashboard' %}◫{% elif a.kind == 'demo' %}▶{% elif a.kind == 'proposal' %}✉{% else %}▣{% endif %}</span>
+      <span class="tx">
+        <span class="tt">{% if a.link and a.link.startswith('http') %}<a href="{{ a.link }}" target="_blank">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}{% if a.version %} · {{ a.version }}{% endif %}</span>
+        <span class="ss">{{ a.kind }} · {{ a.created_at[:10] }}</span>
+      </span>
+      {% if a.sent_at %}<span class="sent">SENT ✓ {{ a.sent_at[:10] }}</span>{% endif %}
+    </div>
+    {% else %}<div class="quiet">Nothing built for this client yet.</div>{% endfor %}
+    <form class="art-form" method="post" action="/targets/{{ co.id }}/artifacts">
+      <details>
+        <summary>+ Log work (deck, doc, demo…)</summary>
+        <div class="row2">
+          <select class="in" name="kind">
+            <option value="deck">Deck</option><option value="pdf">PDF</option>
+            <option value="dashboard">Dashboard</option><option value="demo">Demo</option>
+            <option value="proposal">Proposal</option><option value="doc">Doc</option>
+          </select>
+          <input class="in" name="version" placeholder="v1 (optional)">
+        </div>
+        <input class="in" name="title" placeholder="What did you build…" required>
+        <input class="in" name="link" placeholder="Link or path (optional)">
+        <select class="in" name="sent_via">
+          <option value="">Not sent yet</option>
+          <option value="email">…and I sent it by mail</option>
+          <option value="whatsapp">…and I sent it on WhatsApp</option>
+          <option value="linkedin">…and I sent it on LinkedIn</option>
+        </select>
+        <button class="btn-primary">Save work</button>
+      </details>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script src="/static/ondevice.js"></script>
+<script>
+(function() {
+  const CID = "{{ co.id }}";
+  window.FOOTHOLD_CID = CID;   // the app-wide capture bar (app_base) logs to this lead
+
+  // ── instant tab switching (both panes are pre-rendered; no round-trip) ──
+  const tabBtns = document.querySelectorAll('.d-tabs button');
+  const panes = document.querySelectorAll('.tabpane');
+  function showTab(name) {
+    panes.forEach(p => { p.hidden = (p.dataset.pane !== name); });
+    tabBtns.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+    try { history.replaceState(null, '', '?tab=' + name); } catch(_) {}
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  tabBtns.forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+  // ── AI recommendation polling/actions ──
+  function suggestPoll() {
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch(`/targets/${CID}/suggest/status`);
+        const d = await r.json();
+        if (d.status === 'done' || d.status === 'failed') { clearInterval(t); location.reload(); }
+      } catch(_){}
+    }, 6000);
+  }
+  const cta = document.getElementById('moves-cta');
+  if (cta) cta.addEventListener('click', async () => {
+    cta.disabled = true;
+    cta.innerHTML = '◐ Thinking over the full picture… ~2 min <small>You can leave this page.</small>';
+    await fetch(`/targets/${CID}/suggest/request`, {method: 'POST'});
+    suggestPoll();
+  });
+  const movesBox = document.getElementById('moves');
+  if (movesBox && movesBox.dataset.poll) suggestPoll();
+  const refresh = document.getElementById('moves-refresh');
+  if (refresh) refresh.addEventListener('click', async () => {
+    refresh.textContent = '◐ thinking…';
+    await fetch(`/targets/${CID}/suggest/request`, {method: 'POST'});
+    suggestPoll();
+  });
+  // ── recommendation: channel button → open the right app + log + advance ──
+  const CONTACT = {{ contact | tojson }};
+  function channelLink(ch) {
+    if (ch === 'call' && CONTACT.phone) return 'tel:' + CONTACT.phone.replace(/[^0-9+]/g,'');
+    if (ch === 'whatsapp' && CONTACT.wa) return 'https://wa.me/' + CONTACT.wa.replace(/[^0-9]/g,'');
+    if (ch === 'email' && CONTACT.email) return 'mailto:' + CONTACT.email;
+    return null;
+  }
+  const go = document.querySelector('.rec-go');
+  if (go) go.addEventListener('click', async () => {
+    const ch = go.dataset.channel, sid = go.dataset.sid;
+    const link = channelLink(ch);
+    if (ch !== 'meeting' && !link) {        // need a contact for this channel
+      const ed = document.getElementById('contact-ed'); if (ed) { ed.open = true; ed.scrollIntoView({block:'center'}); }
+      return;
+    }
+    if (link) window.location.href = link;   // opens dialer / WhatsApp / mail
+    const fd = new FormData(); fd.append('channel', ch); fd.append('with_name', CONTACT.name || '');
+    try { await fetch(`/suggestions/${sid}/act`, {method:'POST', body: fd}); } catch(_){}
+    setTimeout(() => location.reload(), 400);
+  });
+  const snooze = document.querySelector('.rec-snooze');
+  if (snooze) snooze.addEventListener('click', async () => {
+    await fetch(`/suggestions/${snooze.dataset.sid}/dismiss`, {method:'POST'});
+    location.reload();
+  });
+  document.querySelectorAll('.move-mini').forEach(m => {
+    const sid = m.dataset.sid;
+    const t = m.querySelector('[data-task]');
+    if (t) t.addEventListener('click', async (e) => {
+      const r = await fetch(`/suggestions/${sid}/task`, {method:'POST'});
+      if (r.ok) { const d = await r.json(); e.target.textContent = '✓ ' + d.due_date.slice(5); e.target.disabled = true; }
+    });
+  });
+
+  // ── contact editor: save without a full-page JSON redirect ──
+  const cForm = document.getElementById('contact-form');
+  if (cForm) cForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const r = await fetch(cForm.action, {method:'POST', body: new FormData(cForm)});
+    if (r.ok) location.reload();
+  });
+
+  // ── import from phone contacts (native plugin → Web Contact Picker) ──
+  const NativeContacts = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Contacts;
+  const webContacts = !!(navigator.contacts && navigator.contacts.select);
+
+  // The native plugin's "contacts" alias needs both READ+WRITE granted before
+  // pickContact will open. Request explicitly so the OS prompt is shown, and
+  // tell the user plainly if it was refused (instead of failing silently).
+  async function ensureContactsPermission() {
+    if (!(NativeContacts && NativeContacts.requestPermissions)) return true;
+    try {
+      let st = await NativeContacts.checkPermissions();
+      if (st && st.contacts === 'granted') return true;
+      st = await NativeContacts.requestPermissions();
+      return !!(st && st.contacts === 'granted');
+    } catch (e) { return false; }
+  }
+
+  async function pickContact() {
+    if (NativeContacts && NativeContacts.pickContact) {
+      const ok = await ensureContactsPermission();
+      if (!ok) { alert('Contacts access is off. Enable it for Foothold in Settings › Apps › Foothold › Permissions, then try again.'); return null; }
+      const res = await NativeContacts.pickContact({ projection: { name:true, phones:true, emails:true } });
+      const c = (res && (res.contact || res)) || {};
+      return {
+        name: (c.name && c.name.display) || '',
+        phone: (c.phones && c.phones[0] && c.phones[0].number) || '',
+        email: (c.emails && c.emails[0] && c.emails[0].address) || '',
+      };
+    }
+    if (webContacts) {
+      const want = ['name','tel','email'];
+      const props = (navigator.contacts.getProperties ? await navigator.contacts.getProperties() : want);
+      const sel = await navigator.contacts.select(want.filter(p => props.includes(p)), { multiple:false });
+      if (!sel || !sel[0]) return null;
+      const c = sel[0];
+      return { name:(c.name&&c.name[0])||'', phone:(c.tel&&c.tel[0])||'', email:(c.email&&c.email[0])||'' };
+    }
+    return undefined;   // no capability on this platform
+  }
+  const importBtn = document.getElementById('import-contact');
+  if (importBtn && (NativeContacts || webContacts)) {
+    importBtn.hidden = false;
+    importBtn.addEventListener('click', async () => {
+      try {
+        const c = await pickContact();
+        if (c === undefined || c === null) return;   // unsupported or cancelled
+        if (!c.name && !c.phone && !c.email) { alert('No phone or email on that contact.'); return; }
+        if (c.name)  cForm.dm_name.value  = c.name;
+        if (c.phone) { cForm.dm_phone.value = c.phone; cForm.dm_whatsapp.value = c.phone.replace(/[^0-9]/g,''); }
+        if (c.email) cForm.dm_email.value = c.email;
+      } catch (e) {
+        alert('Couldn’t import contact: ' + ((e && e.message) || e));
+      }
+    });
+  }
+
+  // ── action bar → open the real app + arm post-action feedback ──
+  document.querySelectorAll('.actbar button').forEach(b => {
+    b.addEventListener('click', () => {
+      const ch = b.dataset.act;
+      const name = CONTACT.name || '';
+      const link = channelLink(ch);   // tel:/wa.me/mailto: when contact is on file
+      if ((ch === 'call' || ch === 'whatsapp' || ch === 'email') && !link) {
+        const ed = document.getElementById('contact-ed');   // no number yet → add one
+        if (ed) { ed.open = true; ed.scrollIntoView({block:'center'}); }
+        return;
+      }
+      // Arm the post-action feedback so when you return, the app asks how it went.
+      try { localStorage.setItem('foothold_pending', JSON.stringify({cid: CID, name, channel: ch, ts: Date.now()})); } catch(_){}
+      if (link) { window.location.href = link; }            // open the real app (call/WA/mail)
+      else if (window.FootholdPostAction) window.FootholdPostAction();  // meeting: prompt now
+    });
+  });
+
+  // ── funnel stepper ──
+  document.querySelectorAll('.stepper button').forEach(b => {
+    b.addEventListener('click', async () => {
+      const cur = b.classList.contains('on') || b.classList.contains('won-on');
+      const stage = cur ? 'new' : b.dataset.stage;
+      const fd = new FormData(); fd.append('status', stage);
+      await fetch(`/targets/${CID}/status`, {method: 'POST', body: fd});
+      location.reload();
+    });
+  });
+
+  // ── temperature picker ──
+  document.querySelectorAll('.temp-pick button').forEach(b => {
+    b.addEventListener('click', async () => {
+      const fd = new FormData(); fd.append('temperature', b.dataset.temp);
+      await fetch(`/targets/${CID}/temperature`, {method: 'POST', body: fd});
+      document.querySelectorAll('.temp-pick button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+    });
+  });
+
+  // ── task rows ──
+  document.querySelectorAll('.task').forEach(row => {
+    const fid = row.dataset.fid;
+    const ring = row.querySelector('.ring');
+    if (ring) ring.addEventListener('change', async () => {
+      const ep = ring.checked ? 'done' : 'reopen';
+      const r = await fetch(`/api/followups/${fid}/${ep}`, {method: 'POST'});
+      if (r.ok) row.classList.toggle('dim', ring.checked); else ring.checked = !ring.checked;
+    });
+    const del = row.querySelector('[data-del]');
+    if (del) del.addEventListener('click', async () => {
+      if (!confirm('Delete this task?')) return;
+      const r = await fetch(`/api/followups/${fid}/delete`, {method: 'POST'});
+      if (r.ok) row.remove();
+    });
+  });
+
+  // ── on-device AI setup banner (first-run model download) ──
+  (async function setupAI(){
+    const box = document.getElementById('ai-setup');
+    if (!box || !window.FootholdAI || !window.FootholdAI.isNative) return;
+    let st, manifest;
+    try {
+      st = await window.FootholdAI.status();
+      manifest = (await (await fetch('/api/ai/models')).json()).models || [];
+    } catch(_) { return; }
+    if (!manifest.length) return;               // no model URLs configured server-side
+    const missing = manifest.some(m =>
+      (m.filename === 'embedder.tflite' && !st.embedReady) ||
+      (m.filename === 'gemma2-2b-it-int4.task' && !st.generateReady));
+    if (!missing) return;
+    const totalGB = manifest.reduce((s,m)=>s+(m.bytes||0),0) / 1e9;
+    if (totalGB > 0.05) document.getElementById('ai-setup-sub').textContent =
+      `Private semantic memory + offline answers · ~${totalGB.toFixed(1)} GB · Wi-Fi recommended`;
+    box.hidden = false;
+
+    const btn = document.getElementById('ai-setup-btn');
+    const prog = document.getElementById('ai-setup-prog');
+    const bar = document.getElementById('ai-setup-bar');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; prog.hidden = false;
+      try {
+        await window.FootholdAI.ensureModels((p) => {
+          if (typeof p.pct === 'number' && p.pct >= 0) bar.style.width = p.pct + '%';
+          btn.textContent = p.pct >= 0 ? `${p.label} · ${p.pct}%` : `${p.label}…`;
+        });
+        bar.style.width = '100%'; btn.textContent = '✓ On-device AI ready';
+        setTimeout(() => { box.hidden = true; }, 1500);
+      } catch(e) {
+        btn.disabled = false; btn.textContent = 'Retry download';
+      }
+    });
+  })();
+
+  // ── diary entry edit / delete (learning loop) ──
+  const DIARY_EP = {
+    comm:     { path: 'comms',     field: 'notes' },
+    note:     { path: 'notes',     field: 'content' },
+    artifact: { path: 'artifacts', field: 'title' },
+  };
+  document.querySelectorAll('.diary-entry').forEach(entry => {
+    const src = entry.dataset.src, ref = entry.dataset.ref;
+    const cfg = DIARY_EP[src];
+    const dt = entry.querySelector('.dt');
+    const editBtn = entry.querySelector('.d-edit');
+    const delBtn  = entry.querySelector('.d-del');
+    if (!cfg || !dt) { if (editBtn) editBtn.style.display = 'none'; }
+
+    if (editBtn && cfg) editBtn.addEventListener('click', () => {
+      if (entry.querySelector('.dt-box')) { entry.classList.toggle('editing'); return; }
+      const box = document.createElement('div');
+      box.className = 'dt-box';
+      const ta = document.createElement('textarea');
+      ta.value = dt.textContent.trim();
+      const row = document.createElement('div'); row.className = 'row';
+      const save = document.createElement('button'); save.className = 'save'; save.textContent = 'Save';
+      const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
+      row.append(save, cancel); box.append(ta, row); dt.after(box);
+      dt.classList.add('edit'); entry.classList.add('editing'); ta.focus();
+      cancel.addEventListener('click', () => { entry.classList.remove('editing'); dt.classList.remove('edit'); box.remove(); });
+      save.addEventListener('click', async () => {
+        const fd = new FormData(); fd.append(cfg.field, ta.value);
+        save.textContent = '…'; save.disabled = true;
+        const r = await fetch(`/api/${cfg.path}/${ref}/edit`, {method: 'POST', body: fd});
+        if (r.ok) { dt.textContent = ta.value; entry.classList.remove('editing'); dt.classList.remove('edit'); box.remove(); }
+        else { save.textContent = 'Save'; save.disabled = false; }
+      });
+    });
+
+    if (delBtn && cfg) delBtn.addEventListener('click', async () => {
+      if (!confirm('Delete this entry from memory?')) return;
+      const r = await fetch(`/api/${cfg.path}/${ref}/delete`, {method: 'POST'});
+      if (r.ok) { const line = entry.querySelector('.line'); entry.remove(); }
+    });
+  });
+
+  // ── AI research (background tab) ──
+  const air = document.getElementById('air-btn');
+  if (air && !air.classList.contains('running')) {
+    air.addEventListener('click', async () => {
+      air.classList.remove('failed'); air.classList.add('running');
+      air.innerHTML = '◐ Researching… <small>~5 min — you can leave this page.</small>';
+      await fetch(`/targets/${CID}/research/request`, {method: 'POST'});
+      poll();
+    });
+  }
+  if (air && air.classList.contains('running')) poll();
+  function poll() {
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch(`/targets/${CID}/research/status`);
+        const d = await r.json();
+        if (d.status === 'done' || d.status === 'failed') { clearInterval(t); location.reload(); }
+      } catch(_){}
+    }, 5000);
+  }
+
+  // ── headcount chart (background tab) ──
+  const hcEl = document.getElementById('hc-json');
+  if (hcEl) {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+    s.onload = () => {
+      const HC = JSON.parse(hcEl.textContent);
+      const depts = [...new Set(HC.map(r => r.department))];
+      new Chart(document.getElementById('hc-chart'), {
+        type: 'bar',
+        data: { labels: depts, datasets: [{
+          data: depts.map(d => (HC.find(r => r.department === d) || {}).headcount || 0),
+          backgroundColor: '#161514', borderRadius: 6, barPercentage: .65 }] },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, grid: { color: '#ece8e2' } },
+                    x: { ticks: { font: { size: 9 }, maxRotation: 40 }, grid: { display: false } } } }
+      });
+    };
+    document.body.appendChild(s);
+  }
+})();
+</script>
+{% endblock %}

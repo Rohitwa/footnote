@@ -1,0 +1,152 @@
+{% extends "app_base.html" %}
+{% block title %}Foothold · Plan{% endblock %}
+
+{% block style %}
+.ag-day { font-size:12px; font-weight:800; letter-spacing:.1em; color:var(--ink3); margin:22px 0 10px; text-transform:uppercase; }
+.ag-day b { color:var(--ink); }
+.ag-day.red b { color:var(--red); }
+.empty-day { font-size:13px; color:var(--ink3); font-style:italic; padding:2px 0; }
+
+/* month grid */
+.cal { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--rule); border-radius:16px; overflow:hidden; }
+.cal th { font-size:10px; font-weight:700; letter-spacing:.06em; color:var(--ink3); padding:10px 4px; border-bottom:1px solid var(--rule); }
+.cal td {
+  text-align:center; padding:0; height:52px; border-bottom:1px solid var(--rule);
+  font-size:12.5px; vertical-align:middle; position:relative;
+}
+.cal td a { display:block; padding:8px 2px; }
+.cal td.other { color:var(--ink3); opacity:.5; }
+.cal td.today { font-weight:800; }
+.cal td.today a::after { content:""; position:absolute; top:6px; left:50%; transform:translateX(-50%); width:26px; height:26px; border:1.5px solid var(--amber); border-radius:50%; }
+.cal .dots { display:flex; gap:2px; justify-content:center; margin-top:2px; height:5px; }
+.cal .dots i { width:5px; height:5px; border-radius:50%; background:var(--ink); display:inline-block; }
+.cal .dots i.done { background:var(--green); opacity:.6; }
+.cal .dots i.over { background:var(--red); }
+.cal-nav { display:flex; align-items:center; justify-content:space-between; margin:4px 0 12px; }
+.cal-nav .m { font-size:15px; font-weight:800; }
+.cal-nav a { font-size:18px; color:var(--ink2); padding:4px 12px; }
+{% endblock %}
+
+{% block content %}
+<div class="h-page">Plan</div>
+
+<div class="seg">
+  <a class="s {% if view != 'month' %}on{% endif %}" href="/calendar">Agenda</a>
+  <a class="s {% if view == 'month' %}on{% endif %}" href="/calendar?view=month">Month</a>
+</div>
+
+{% if view == 'month' %}
+  <div class="cal-nav">
+    <a href="/calendar?view=month&y={{ prev_year }}&m={{ prev_month }}">‹</a>
+    <span class="m">{{ month_label }}</span>
+    <a href="/calendar?view=month&y={{ next_year }}&m={{ next_month }}">›</a>
+  </div>
+  <table class="cal">
+    <thead><tr><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th><th>S</th></tr></thead>
+    <tbody>
+    {% for week in weeks %}
+    <tr>
+      {% for c in week %}
+      <td class="{% if c.is_today %}today{% endif %} {% if c.is_other_mo %}other{% endif %}">
+        <a href="/calendar?view=month&y={{ year }}&m={{ month }}&d={{ c.iso }}">{{ c.day_num }}
+          <span class="dots">
+            {% for _ in range([c.n_pending, 3] | min) %}<i class="{% if c.is_past %}over{% endif %}"></i>{% endfor %}
+            {% for _ in range([c.n_done, 3 - [c.n_pending,3]|min] | min) %}<i class="done"></i>{% endfor %}
+          </span></a>
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if day_iso %}
+  <div class="ag-day"><b>{{ day_pretty }}</b></div>
+  {% for f in day_items %}
+  <div class="task {% if f.status != 'pending' %}dim{% endif %}" data-fid="{{ f.id }}">
+    <input type="checkbox" class="ring" {% if f.status != 'pending' %}checked{% endif %}>
+    <div class="tx"><div class="a">{{ f.action_text }}</div><div class="c">{{ f.ticker or f.company_name }}</div></div>
+    <button class="mini" data-del>✕</button>
+  </div>
+  {% else %}<div class="empty-day">Nothing on this day.</div>{% endfor %}
+  {% endif %}
+
+{% else %}
+  {# ── agenda ── #}
+  {% if overdue %}
+  <div class="ag-day red"><b>OVERDUE</b></div>
+  {% for f in overdue %}
+  <div class="task" data-fid="{{ f.id }}">
+    <input type="checkbox" class="ring">
+    <div class="tx"><div class="a">{{ f.action_text }}</div><div class="c" style="color:var(--red);">{{ f.ticker or f.company_name }} · {{ f.due_date }}</div></div>
+    <button class="mini" data-del>✕</button>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% for g in agenda %}
+  <div class="ag-day"><b>{{ g.title }}</b>{% if g.sub %} · {{ g.sub }}{% endif %}</div>
+  {% for f in g["items"] %}
+  <div class="task {% if f.status != 'pending' %}dim{% endif %}" data-fid="{{ f.id }}">
+    <input type="checkbox" class="ring" {% if f.status != 'pending' %}checked{% endif %}>
+    <div class="tx"><div class="a">{{ f.action_text }}</div><div class="c">{{ f.ticker or f.company_name }}</div></div>
+    <button class="mini" data-del>✕</button>
+  </div>
+  {% else %}<div class="empty-day">Nothing yet.</div>{% endfor %}
+  {% endfor %}
+{% endif %}
+
+<button class="fab" id="fab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+{% endblock %}
+
+{% block sheets %}
+<div class="sheet-dim" id="add-dim"></div>
+<div class="sheet" id="add-sheet">
+  <div class="grab"></div>
+  <h2>New task</h2>
+  <input class="in" id="add-text" placeholder="What needs doing…">
+  <input class="in" type="date" id="add-date" value="{{ today_iso }}">
+  <select class="in" id="add-co"><option value="">Company…</option>
+    {% for c in catalog %}<option value="{{ c.id }}">{{ c.ticker or c.name }}</option>{% endfor %}
+  </select>
+  <button class="btn-primary" id="add-save">Add</button>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+(function() {
+  const dim = document.getElementById('add-dim'), sheet = document.getElementById('add-sheet');
+  document.getElementById('fab').addEventListener('click', () => { dim.classList.add('open'); sheet.classList.add('open'); });
+  dim.addEventListener('click', () => { dim.classList.remove('open'); sheet.classList.remove('open'); });
+
+  document.getElementById('add-save').addEventListener('click', async () => {
+    const text = document.getElementById('add-text').value.trim();
+    const cid = document.getElementById('add-co').value;
+    if (!text || !cid) { alert('Task text and company are required.'); return; }
+    const fd = new FormData();
+    fd.append('company_id', cid);
+    fd.append('due_date', document.getElementById('add-date').value);
+    fd.append('action_text', text);
+    const r = await fetch('/capture/accept', {method: 'POST', body: fd});
+    if (r.ok) location.reload(); else alert('Save failed.');
+  });
+
+  document.querySelectorAll('.task').forEach(row => {
+    const fid = row.dataset.fid;
+    const ring = row.querySelector('.ring');
+    if (ring) ring.addEventListener('change', async () => {
+      const ep = ring.checked ? 'done' : 'reopen';
+      const r = await fetch(`/api/followups/${fid}/${ep}`, {method: 'POST'});
+      if (r.ok) row.classList.toggle('dim', ring.checked); else ring.checked = !ring.checked;
+    });
+    const del = row.querySelector('[data-del]');
+    if (del) del.addEventListener('click', async () => {
+      if (!confirm('Delete this task?')) return;
+      const r = await fetch(`/api/followups/${fid}/delete`, {method: 'POST'});
+      if (r.ok) row.remove();
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>{% block title %}Foothold{% endblock %}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+:root {
+  --paper:#faf8f5; --card:#ffffff; --ink:#161514; --ink2:#6b6660; --ink3:#9b958d;
+  --rule:#ece8e2; --amber:#c25e02; --amber-soft:#fdf1e3;
+  --green:#1c7c3c; --green-soft:#e8f5ec; --red:#b3261e; --red-soft:#fbeae9;
+  --blue:#7da7d9;
+  --mono:"JetBrains Mono",monospace;
+  --tabbar-h:74px;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html { background:var(--paper); }
+body {
+  font-family:"Hanken Grotesk",sans-serif; background:var(--paper); color:var(--ink);
+  min-height:100vh;
+}
+a { color:inherit; text-decoration:none; }
+button, input, select, textarea { font:inherit; color:inherit; }
+
+.page {
+  max-width:640px; margin:0 auto;
+  /* top: clear the phone status bar / notch (was flat 10px → collided with the
+     device clock & battery). viewport-fit=cover exposes the inset. */
+  padding:calc(10px + env(safe-area-inset-top)) 22px calc(var(--tabbar-h) + 96px);
+}
+
+/* ── bottom tab bar (mobile-first) ── */
+.tabbar {
+  position:fixed; left:0; right:0; bottom:0; z-index:50;
+  height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);
+  background:var(--card); border-top:1px solid var(--rule);
+  display:flex; align-items:center;
+}
+body.kb-open .tabbar { display:none; }   /* keyboard owns the bottom */
+.tabbar .tab {
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  color:var(--ink3); font-size:10.5px; font-weight:600; flex:1 1 0;
+}
+.tabbar .tab svg { width:23px; height:23px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.tabbar .tab.on { color:var(--ink); }
+.tabbar .tab.on svg { stroke-width:2.4; }
+
+/* ── desktop: slim top bar instead ── */
+@media (min-width:768px) {
+  .page { padding-bottom:60px; padding-top:64px; }
+  .tabbar {
+    top:0; bottom:auto; height:56px; padding-bottom:0;
+    border-top:0; border-bottom:1px solid var(--rule);
+    justify-content:center; gap:38px;
+  }
+  .tabbar .tab { flex-direction:row; gap:8px; font-size:13px; width:auto; }
+  .tabbar .tab svg { width:18px; height:18px; }
+  .tabbar::before {
+    content:"FOOTHOLD"; position:absolute; left:28px; top:0; bottom:0;
+    display:flex; align-items:center;
+    font-size:12px; font-weight:800; letter-spacing:.18em; color:var(--ink);
+  }
+}
+
+/* ── shared atoms ── */
+.h-page { font-size:30px; font-weight:800; letter-spacing:-.03em; margin-top:18px; line-height:1.1; }
+.sub { font-size:13px; color:var(--ink3); margin-top:5px; }
+.sec-head { display:flex; align-items:baseline; justify-content:space-between; margin:30px 0 14px; }
+.sec-head h2 { font-size:13px; font-weight:800; letter-spacing:.1em; color:var(--ink3); }
+.sec-head a, .sec-head button { font-size:12.5px; color:var(--amber); font-weight:700; background:none; border:0; cursor:pointer; }
+
+.card {
+  background:var(--card); border:1px solid var(--rule); border-radius:16px;
+  padding:16px 18px; margin-bottom:10px;
+}
+
+.task {
+  background:var(--card); border-radius:16px; padding:14px 16px; margin-bottom:10px;
+  display:flex; align-items:center; gap:14px; border:1px solid var(--rule);
+}
+.task .ring {
+  width:24px; height:24px; border-radius:50%; border:2px solid var(--ink3);
+  flex-shrink:0; cursor:pointer; appearance:none; -webkit-appearance:none; position:relative;
+}
+.task .ring:checked { background:var(--green); border-color:var(--green); }
+.task .ring:checked::after {
+  content:"✓"; color:#fff; font-size:13px; position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.task .tx { flex:1; min-width:0; }
+.task .tx .a { font-size:15px; font-weight:600; line-height:1.3; overflow-wrap:anywhere; }
+.task .tx .c { font-size:12px; color:var(--ink3); margin-top:2px; font-weight:600; }
+.task.dim { opacity:.45; }
+.task.dim .a { text-decoration:line-through; }
+.task .mini {
+  width:30px; height:30px; border-radius:9px; border:1px solid var(--rule);
+  background:var(--card); color:var(--ink3); cursor:pointer; flex-shrink:0; font-size:12px;
+}
+.task .mini:active { background:var(--paper); }
+.quiet { font-size:13px; color:var(--ink3); text-align:center; margin:16px 0; }
+
+/* touch feedback — taps must feel instant even when the network isn't */
+.lead:active, .task:active, .hit:active, .card a:active {
+  background:var(--paper); transform:scale(.985); transition:transform .05s;
+}
+
+.seg { display:flex; gap:8px; margin:16px 0 18px; flex-wrap:wrap; }
+.seg .s {
+  font-size:13px; font-weight:700; padding:8px 16px; border-radius:999px;
+  background:var(--card); border:1px solid var(--rule); color:var(--ink2); cursor:pointer;
+}
+.seg .s.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+
+.fab {
+  position:fixed; right:20px; bottom:calc(var(--tabbar-h) + 22px); z-index:40;
+  width:58px; height:58px; border-radius:50%; border:0; cursor:pointer;
+  background:var(--amber); display:flex; align-items:center; justify-content:center;
+  box-shadow:0 8px 22px rgba(194,94,2,.4);
+}
+.fab svg { width:26px; height:26px; stroke:#fff; stroke-width:2.4; fill:none; stroke-linecap:round; }
+@media (min-width:768px) { .fab { bottom:34px; } }
+
+/* ── bottom sheet ── */
+.sheet-dim {
+  position:fixed; inset:0; background:rgba(22,21,20,.5); z-index:60; display:none;
+}
+.sheet {
+  position:fixed; left:0; right:0; bottom:0; z-index:61; display:none;
+  background:var(--paper); border-radius:28px 28px 0 0;
+  padding:14px 24px calc(28px + env(safe-area-inset-bottom));
+  max-height:86vh; overflow-y:auto;
+  max-width:640px; margin:0 auto;
+}
+.sheet.open, .sheet-dim.open { display:block; }
+.sheet .grab { width:40px; height:4px; background:var(--rule); border-radius:99px; margin:0 auto 20px; }
+.sheet h2 { font-size:21px; font-weight:800; letter-spacing:-.02em; }
+.sheet .hint { font-size:13px; color:var(--ink3); margin-top:4px; }
+
+/* generic inputs */
+.in {
+  width:100%; background:var(--card); border:1px solid var(--rule); border-radius:14px;
+  padding:13px 16px; font-size:15px; margin-top:10px;
+}
+.in:focus { outline:none; border-color:var(--ink); }
+.btn-primary {
+  width:100%; background:var(--ink); color:#fff; border:0; border-radius:14px;
+  padding:15px; font-size:15px; font-weight:700; cursor:pointer; margin-top:14px;
+}
+.btn-primary:disabled { opacity:.5; }
+
+/* ── app-wide universal capture bar ── */
+.cap-fab { position:fixed; left:0; right:0; z-index:55;
+  bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding:8px 16px 10px; background:var(--paper); border-top:1px solid var(--rule); }
+body.kb-open .cap-fab { bottom:0; }
+.capbar { display:flex; align-items:center; gap:11px; background:var(--card); border:1px solid var(--rule);
+  border-radius:30px; padding:7px 10px 7px 7px; margin:0; box-shadow:0 4px 16px rgba(0,0,0,.07); }
+.capbar input { flex:1; border:0; background:none; font-size:14.5px; color:var(--ink); outline:none; }
+.capbar .send { background:none; border:0; font-size:16px; color:var(--ink3); cursor:pointer; }
+.capbar .cap-mic { width:44px; height:44px; flex-shrink:0; border-radius:50%; border:0; cursor:pointer;
+  background:var(--amber); color:#fff; display:flex; align-items:center; justify-content:center; padding:0; }
+.capbar .cap-mic svg { width:22px; height:22px; }
+.capbar .cap-mic.recording { background:var(--red); animation:micpulse 1.3s infinite; }
+@keyframes micpulse {
+  0%   { box-shadow:0 0 0 0 rgba(226,75,74,.55); }
+  70%  { box-shadow:0 0 0 14px rgba(226,75,74,0); }
+  100% { box-shadow:0 0 0 0 rgba(226,75,74,0); }
+}
+.cap-fab .ask-answer, .cap-fab .cap-confirm, .cap-fab .cap-matches { margin:0 0 8px; max-height:38vh; overflow:auto; }
+.cap-matches { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:6px; }
+.cap-matches a { display:block; padding:10px 12px; font-size:14px; font-weight:600; color:var(--ink); border-radius:10px; }
+.cap-confirm { background:#e7f3e2; color:var(--green); border-radius:12px; padding:11px 14px; font-size:13px; font-weight:600; }
+.cap-confirm.warn { background:#fdecec; color:var(--red); }
+.cap-confirm .cap-undo { margin-left:8px; background:rgba(0,0,0,.07); border:0; border-radius:8px;
+  padding:4px 10px; font-size:12px; font-weight:700; color:inherit; cursor:pointer; }
+.cap-fab .cap-picker { margin:0 0 8px; background:var(--card); border:1px solid var(--rule);
+  border-radius:14px; padding:12px 14px; max-height:42vh; overflow:auto; }
+.cap-picker .pk-q { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:9px; }
+.cap-picker .pk-new { display:flex; gap:7px; margin-bottom:10px; }
+.cap-picker .pk-new input { flex:1; border:1px solid var(--rule); border-radius:10px; padding:9px 11px;
+  font-size:14px; color:var(--ink); background:var(--paper); outline:none; }
+.cap-picker .pk-new button { border:0; border-radius:10px; padding:0 14px; font-size:13px; font-weight:700;
+  background:var(--ink); color:#fff; cursor:pointer; }
+.cap-picker .pk-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.cap-picker .pk-chips button { border:1px solid var(--rule); background:var(--paper); border-radius:999px;
+  padding:7px 12px; font-size:13px; font-weight:600; color:var(--ink2); cursor:pointer; }
+.post-action { background:var(--ink); color:#fff; border-radius:14px; padding:13px 15px; margin:0 0 8px; }
+.post-action:not([hidden]) { display:flex; align-items:center; gap:10px; }
+.post-action .pa-txt { flex:1; font-size:13.5px; font-weight:600; line-height:1.35; }
+.post-action .pa-txt small { display:block; font-weight:400; font-size:11.5px; color:#b8b3ac; margin-top:2px; }
+.post-action .pa-skip { background:none; border:0; color:#b8b3ac; font-size:13px; cursor:pointer; padding:4px; }
+.ask-answer { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:14px 16px; }
+.ask-answer .q { font-size:11px; font-weight:800; letter-spacing:.04em; color:var(--ink3); text-transform:uppercase; }
+.ask-answer .a { font-size:14px; line-height:1.5; color:var(--ink); margin-top:6px; overflow-wrap:anywhere; }
+.ask-answer .srcs { margin-top:10px; border-top:1px solid var(--rule); padding-top:8px; }
+.ask-answer .src { font-size:12px; color:var(--ink2); line-height:1.4; padding:4px 0; }
+.ask-answer .src .tag { font-size:9.5px; font-weight:800; letter-spacing:.04em; color:var(--amber); text-transform:uppercase; margin-right:6px; }
+.ask-answer .close { float:right; background:none; border:0; color:var(--ink3); font-size:14px; cursor:pointer; }
+{% block style %}{% endblock %}
+</style>
+</head>
+<body>
+
+<div class="page">
+{% block content %}{% endblock %}
+</div>
+
+<nav class="tabbar">
+  <a class="tab {% if active_tab == 'home' %}on{% endif %}" href="/today">
+    <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home</a>
+  <a class="tab {% if active_tab == 'leads' %}on{% endif %}" href="/leads">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>Leads</a>
+  <a class="tab {% if active_tab == 'plan' %}on{% endif %}" href="/calendar">
+    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Plan</a>
+</nav>
+
+{% block sheets %}{% endblock %}
+
+{% block capture %}
+<div class="cap-fab">
+  <div id="post-action" class="post-action" hidden></div>
+  <div id="ask-answer" class="ask-answer" hidden></div>
+  <div id="cap-confirm" class="cap-confirm" hidden></div>
+  <div id="cap-matches" class="cap-matches" hidden></div>
+  <div id="cap-picker" class="cap-picker" hidden></div>
+  <form class="capbar" id="capbar">
+    <button type="button" class="cap-mic" id="capbar-mic" aria-label="Tap to speak">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/></svg>
+    </button>
+    <input id="capbar-in" autocomplete="off" placeholder="Ask or log anything — tap mic or type" required>
+    <button class="send" type="submit" aria-label="Send">↑</button>
+  </form>
+</div>
+{% endblock %}
+
+<div id="navbar-progress" style="position:fixed;top:0;left:0;height:3px;width:0;background:var(--amber);z-index:99;transition:width .4s;"></div>
+<script>
+// hide tab bar while the keyboard is open (Android fixed-bottom fix)
+document.addEventListener('focusin', (e) => {
+  if (e.target.matches('input[type=text],input[type=search],input:not([type]),textarea,select,input[type=date]'))
+    document.body.classList.add('kb-open');
+});
+document.addEventListener('focusout', () => {
+  setTimeout(() => {
+    if (!document.activeElement || !document.activeElement.matches('input,textarea,select'))
+      document.body.classList.remove('kb-open');
+  }, 80);
+});
+// instant feedback on navigation — thin amber progress bar
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href]');
+  if (a && !a.href.startsWith('javascript') && a.target !== '_blank') {
+    const p = document.getElementById('navbar-progress');
+    p.style.width = '70%';
+  }
+});
+window.addEventListener('pageshow', () => {
+  const p = document.getElementById('navbar-progress');
+  p.style.width = '0';
+});
+
+// ── app-wide universal capture: voice/text → /ai/route → do the job ──
+(function(){
+  const capbar = document.getElementById('capbar');
+  if (!capbar) return;
+  const capIn = document.getElementById('capbar-in');
+  const answerBox = document.getElementById('ask-answer');
+  const confirmEl = document.getElementById('cap-confirm');
+  const matchesEl = document.getElementById('cap-matches');
+  const capMic = document.getElementById('capbar-mic');
+  function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+
+  let capRec=null, capChunks=[];
+  if (capMic) capMic.addEventListener('click', async () => {
+    if (capRec && capRec.state==='recording') { capRec.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+      capRec = new MediaRecorder(stream,{mimeType:mime}); capChunks=[];
+      capRec.addEventListener('dataavailable', e => { if (e.data && e.data.size) capChunks.push(e.data); });
+      capRec.addEventListener('stop', async () => {
+        capMic.classList.remove('recording');
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(capChunks,{type:mime});
+        if (blob.size < 800) { capIn.placeholder='Didn’t catch that — tap mic again'; return; }
+        capIn.placeholder='Got it — working…';
+        const fd = new FormData(); fd.append('audio', blob, 'capture.webm');
+        try {
+          const r = await fetch('/capture/transcribe',{method:'POST',body:fd});
+          const d = await r.json();
+          capIn.placeholder='Ask or log anything — tap mic or type';
+          if (d.transcript) { capIn.value = d.transcript.trim(); runCapture(capIn.value); }
+          else { capIn.placeholder='Didn’t catch that — tap mic again'; }
+        } catch(_) { capIn.placeholder='Network error — type instead'; }
+      });
+      capRec.start(); capMic.classList.add('recording'); capIn.placeholder='Listening… tap mic to stop';
+    } catch(_) { capIn.placeholder='Allow mic access, then tap again'; }
+  });
+
+  const pickerEl = document.getElementById('cap-picker');
+  function hideAll(){ answerBox.hidden=true; matchesEl.hidden=true; pickerEl.hidden=true; }
+
+  function showAnswer(text, a){
+    hideAll(); confirmEl.hidden=true; capIn.value='';
+    let html=`<button class="close" aria-label="Close">✕</button><div class="q">${esc(text)}</div>`;
+    if (a.answer) html+=`<div class="a">${esc(a.answer)}</div>`;
+    else if (!(a.sources||[]).length) html+=`<div class="a">No matching memory yet.</div>`;
+    else html+=`<div class="a">Most relevant:</div>`;
+    if ((a.sources||[]).length) html+='<div class="srcs">'+a.sources.map(s=>`<div class="src"><span class="tag">${esc(s.label||s.source)}</span>${esc(s.text)}</div>`).join('')+'</div>';
+    answerBox.innerHTML=html; answerBox.hidden=false;
+    const c=answerBox.querySelector('.close'); if(c) c.addEventListener('click',()=>answerBox.hidden=true);
+  }
+
+  // "Which company is this for?" — keep the utterance and resubmit with a choice.
+  function showPicker(origText, suggestions){
+    hideAll(); confirmEl.hidden=true; capIn.value='';
+    const chips=(suggestions||[]).map(s=>`<button type="button" data-id="${esc(s.id)}">${esc(s.name)}</button>`).join('');
+    pickerEl.innerHTML =
+      `<div class="pk-q">Which company is this for?</div>`+
+      `<div class="pk-new"><input id="pk-new-in" placeholder="Type a company — new or existing"><button type="button" id="pk-new-go">Add</button></div>`+
+      (chips?`<div class="pk-chips">${chips}</div>`:``);
+    pickerEl.hidden=false;
+    pickerEl.querySelectorAll('.pk-chips button').forEach(b=>b.addEventListener('click',()=>
+      runCapture(origText, {force_company_id:b.dataset.id})));
+    const go=pickerEl.querySelector('#pk-new-go'), inp=pickerEl.querySelector('#pk-new-in');
+    const submitNew=()=>{ const v=(inp.value||'').trim(); if(v) runCapture(origText,{force_company_name:v}); };
+    go.addEventListener('click',submitNew);
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submitNew(); }});
+  }
+
+  function showWrite(d){
+    hideAll();
+    const undo=d.undo, warn=!!d.created;
+    confirmEl.hidden=false; confirmEl.className='cap-confirm'+(warn?' warn':'');
+    const label=esc(d.speak||'Done.');
+    confirmEl.innerHTML = (d.executed?'✓ ':'')+label+(undo?` <button type="button" class="cap-undo">Undo</button>`:'');
+    capIn.value='';
+    // Reload so the new task/note shows; give a longer window when a lead was
+    // auto-created (the main thing you might want to undo).
+    let timer = d.executed ? setTimeout(()=>location.reload(), warn?4000:1400) : null;
+    const ub=confirmEl.querySelector('.cap-undo');
+    if (ub) ub.addEventListener('click', async ()=>{
+      if(timer) clearTimeout(timer);
+      ub.disabled=true; confirmEl.innerHTML='↩ Undoing…';
+      try { await fetch('/ai/undo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(undo)}); }
+      catch(_){}
+      confirmEl.textContent='↩ Undone.'; setTimeout(()=>location.reload(),700);
+    });
+  }
+
+  async function runCapture(text, force){
+    text=(text||'').trim(); if(!text) return;
+    const CID = window.FOOTHOLD_CID || '';
+    hideAll(); confirmEl.className='cap-confirm'; confirmEl.hidden=false; confirmEl.textContent='◐ …';
+    // If we just came back from a call/WA/email/meeting, this capture IS the
+    // feedback for that touch — log it directly (fast, no LLM needed).
+    const pend = window.__pending;
+    if (!force && pend && pend.cid === CID) {
+      try {
+        const fd=new FormData(); fd.append('kind',pend.channel); fd.append('direction','out');
+        fd.append('with_name',pend.name||''); fd.append('notes',text);
+        await fetch(`/targets/${CID}/comms`,{method:'POST',body:fd});
+        clearPending();
+        confirmEl.textContent='✓ Logged your '+pend.channel+(pend.name?(' with '+pend.name):'');
+        capIn.value=''; setTimeout(()=>location.reload(),1000);
+      } catch(_) { confirmEl.textContent='Couldn’t save — try again'; }
+      return;
+    }
+    try {
+      const fd=new FormData(); fd.append('text',text); fd.append('company_id',CID);
+      if (force && force.force_company_id) fd.append('force_company_id', force.force_company_id);
+      if (force && force.force_company_name) fd.append('force_company_name', force.force_company_name);
+      const r=await fetch('/ai/route',{method:'POST',body:fd}); const d=await r.json();
+      if (d.error) { confirmEl.textContent='Try again'; return; }
+      if (d.redirect) { confirmEl.textContent='→ '+(d.speak||'Opening…'); window.location.href=d.redirect; return; }
+      if (d.mode==='read' && d.intent==='search') {
+        confirmEl.hidden=true; capIn.value='';
+        if ((d.matches||[]).length) { matchesEl.hidden=false; matchesEl.innerHTML=d.matches.map(m=>`<a href="/leads/${m.id}">${esc(m.name)}</a>`).join(''); }
+        else { confirmEl.hidden=false; confirmEl.textContent=d.speak||'No match found.'; }
+        return;
+      }
+      if (d.mode==='read' && d.intent==='ask') {
+        if (d.executed) showAnswer(text, d.answer||{});
+        else { confirmEl.hidden=false; confirmEl.textContent=d.speak||'Open a company first.'; }
+        return;
+      }
+      if (d.needs_company) { showPicker(text, d.suggestions); return; }
+      showWrite(d);   // mode === 'write'
+    } catch(_) { confirmEl.hidden=false; confirmEl.textContent='Couldn’t reach the server.'; }
+  }
+  capbar.addEventListener('submit',(e)=>{ e.preventDefault(); runCapture(capIn.value); });
+
+  // ── post-action feedback: when you return from a call/WA/email/meeting,
+  //    the app asks how it went and the mic is right there to capture it ──
+  const postEl = document.getElementById('post-action');
+  const CH_LABEL = { call:'call', whatsapp:'WhatsApp', email:'email', meeting:'meeting' };
+  const CH_ICON  = { call:'📞', whatsapp:'💬', email:'✉', meeting:'🤝' };
+  function clearPending(){ window.__pending=null; try{ localStorage.removeItem('foothold_pending'); }catch(_){} if(postEl) postEl.hidden=true; }
+  function checkPending(){
+    let p=null;
+    try { p = JSON.parse(localStorage.getItem('foothold_pending')||'null'); } catch(_) {}
+    const CID = window.FOOTHOLD_CID || '';
+    const valid = p && p.cid === CID && (Date.now()-(p.ts||0)) < 20*60*1000;
+    if (!valid) {
+      window.__pending=null; if(postEl) postEl.hidden=true;
+      if (p && (Date.now()-(p.ts||0)) >= 20*60*1000) { try{ localStorage.removeItem('foothold_pending'); }catch(_){} }
+      return;
+    }
+    window.__pending = p;
+    if (!postEl) return;
+    const who = p.name ? ('with ' + p.name) : '';
+    postEl.innerHTML = `<span style="font-size:18px;">${CH_ICON[p.channel]||'🎙'}</span>`
+      + `<span class="pa-txt">How did the ${CH_LABEL[p.channel]||'touch'} ${who} go?<small>Tap the mic and tell me — I’ll log it.</small></span>`
+      + `<button class="pa-skip" aria-label="Skip">✕</button>`;
+    postEl.hidden=false;
+    postEl.querySelector('.pa-skip').addEventListener('click', clearPending);
+    if (capIn) capIn.focus();
+  }
+  window.FootholdPostAction = checkPending;
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkPending(); });
+  window.addEventListener('pageshow', checkPending);
+  checkPending();
+})();
+</script>
+{% block script %}{% endblock %}
+</body>
+</html>

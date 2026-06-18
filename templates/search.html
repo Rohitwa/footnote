@@ -1,0 +1,63 @@
+{% extends "app_base.html" %}
+{% block title %}Foothold · Search{% endblock %}
+
+{% block style %}
+.s-group { margin-top:24px; }
+.s-group h2 { font-size:12px; font-weight:800; letter-spacing:.1em; color:var(--ink3); margin-bottom:10px; }
+.hit { display:block; background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:14px 16px; margin-bottom:8px; }
+.hit .t { font-size:14.5px; font-weight:700; }
+.hit .s { font-size:12.5px; color:var(--ink3); margin-top:3px; line-height:1.45; overflow-wrap:anywhere; }
+{% endblock %}
+
+{% block content %}
+<div class="h-page">Search</div>
+<form method="get" action="/search">
+  <input class="in" name="q" value="{{ q }}" placeholder="Companies, research, notes, tasks…" autofocus autocomplete="off">
+</form>
+
+{% if results %}
+  <div class="sub" style="margin-top:12px;">{{ total }} result{{ '' if total == 1 else 's' }} for "{{ q }}"</div>
+
+  {% if results.companies %}
+  <div class="s-group"><h2>LEADS</h2>
+    {% for r in results.companies %}
+    <a class="hit" href="/leads/{{ r.id }}"><div class="t">{{ r.name }}</div>
+      <div class="s">{{ (r.signal or r.sector or '') | truncate(110) }}</div></a>
+    {% endfor %}
+  </div>{% endif %}
+
+  {% if results.research %}
+  <div class="s-group"><h2>RESEARCH</h2>
+    {% for r in results.research %}
+    <a class="hit" href="/leads/{{ r.company_id }}?tab=research"><div class="t">{{ r.title }}</div>
+      <div class="s">{{ (r.snippet or '') | truncate(140) }}</div></a>
+    {% endfor %}
+  </div>{% endif %}
+
+  {% if results.notes %}
+  <div class="s-group"><h2>NOTES</h2>
+    {% for r in results.notes %}
+    <a class="hit" href="/leads/{{ r.company_id }}?tab=activity"><div class="t">{{ r.company_id }}</div>
+      <div class="s">{{ (r.content or '') | truncate(140) }}</div></a>
+    {% endfor %}
+  </div>{% endif %}
+
+  {% if results.followups %}
+  <div class="s-group"><h2>TASKS</h2>
+    {% for r in results.followups %}
+    <a class="hit" href="/leads/{{ r.company_id }}?tab=activity"><div class="t">{{ r.action_text }}</div>
+      <div class="s">{{ r.due_date }} · {{ r.status }}</div></a>
+    {% endfor %}
+  </div>{% endif %}
+
+  {% if results.signals %}
+  <div class="s-group"><h2>SIGNALS</h2>
+    {% for r in results.signals %}
+    <a class="hit" href="/leads/{{ r.company_id }}"><div class="t">{{ r.headline }}</div>
+      <div class="s">{{ r.event_date }}</div></a>
+    {% endfor %}
+  </div>{% endif %}
+
+  {% if total == 0 %}<div class="quiet" style="margin-top:30px;">Nothing matched.</div>{% endif %}
+{% endif %}
+{% endblock %}

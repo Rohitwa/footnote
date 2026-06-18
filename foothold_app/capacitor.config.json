@@ -1,0 +1,11 @@
+{
+  "appId": "dev.rohit.foothold",
+  "appName": "Foothold",
+  "webDir": "www",
+  "server": {
+    "url": "https://foothold-yantrai.fly.dev"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
