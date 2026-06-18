@@ -1,0 +1,30 @@
+# Secrets / local env
+.env
+*.env
+!.env.example
+
+# Local database
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Android / Capacitor
+foothold_app/node_modules/
+foothold_app/android/.gradle/
+foothold_app/android/.idea/
+foothold_app/android/build/
+foothold_app/android/app/build/
+foothold_app/android/capacitor-cordova-android-plugins/build/
+foothold_app/android/local.properties
+**/*.apk
+**/*.keystore
+**/*.jks
+
+# OS / editor
+.DS_Store
