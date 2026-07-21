@@ -370,3 +370,62 @@ async def research_status(company_id: str):
 @router.get("/research/queue")
 async def research_queue():
     return {"queue": tdb.list_research_requested()}
+
+
+# ── Capture channels (Phase 5) ────────────────────────────────────────────
+# The channel-agnostic ingestion spine. Native Android capture services, the
+# CPaaS call webhook, and the WhatsApp Business webhook all POST here. Bearer-
+# protected (this router carries require_token) + session-exempt (path is under
+# /api/v1, which the HTML auth middleware skips).
+
+class InboundCapture(BaseModel):
+    channel: str = "whatsapp"        # whatsapp / call / sms / email / visit
+    from_phone: Optional[str] = None  # matched to a lead by last-10 digits
+    lead_id: Optional[str] = None     # or address a lead directly
+    text: str = ""                    # message body / transcript
+    direction: str = "in"             # in / out
+    project_id: Optional[str] = None  # optional workspace scope for the match
+
+
+@router.post("/capture/inbound", status_code=201)
+async def capture_inbound(body: InboundCapture):
+    """One endpoint for every capture source. Returns {matched:false} for an
+    untagged number (tagged-contacts-only privacy filter enforced here)."""
+    res = tdb.ingest_capture(
+        from_phone=body.from_phone, lead_id=body.lead_id, channel=body.channel,
+        text=body.text, direction=body.direction, project_id=body.project_id,
+    )
+    return JSONResponse(res, status_code=201 if res.get("matched") else 200)
+
+
+@router.post("/webhooks/whatsapp")
+async def webhook_whatsapp(payload: dict):
+    """Normalize a WhatsApp Business inbound message → ingest. Accepts the
+    common shapes (flat {from,text} or a Cloud-API messages[] envelope)."""
+    frm = payload.get("from") or payload.get("wa_id") or ""
+    text = payload.get("text") or ""
+    if not frm or not text:
+        try:  # WhatsApp Cloud API envelope
+            msg = payload["entry"][0]["changes"][0]["value"]["messages"][0]
+            frm = frm or msg.get("from", "")
+            text = text or (msg.get("text", {}) or {}).get("body", "")
+        except (KeyError, IndexError, TypeError):
+            pass
+    res = tdb.ingest_capture(from_phone=frm, channel="whatsapp", text=text, direction="in")
+    return JSONResponse(res, status_code=201 if res.get("matched") else 200)
+
+
+@router.post("/webhooks/call")
+async def webhook_call(payload: dict):
+    """CPaaS 'call ended' webhook → ingest the transcript + outcome. Provider-
+    agnostic: reads from/caller, transcript, outcome, direction, duration."""
+    frm = payload.get("from") or payload.get("caller") or payload.get("to") or ""
+    transcript = (payload.get("transcript") or "").strip()
+    outcome = (payload.get("outcome") or "").strip()
+    dur = payload.get("duration")
+    direction = payload.get("direction", "out")
+    parts = [p for p in (transcript, (f"[{outcome}]" if outcome else ""),
+                         (f"({dur}s)" if dur else "")) if p]
+    text = " ".join(parts) or "(call — no transcript)"
+    res = tdb.ingest_capture(from_phone=frm, channel="call", text=text, direction=direction)
+    return JSONResponse(res, status_code=201 if res.get("matched") else 200)

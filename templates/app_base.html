@@ -198,10 +198,52 @@ body.kb-open .cap-fab { bottom:0; }
 .ask-answer .src { font-size:12px; color:var(--ink2); line-height:1.4; padding:4px 0; }
 .ask-answer .src .tag { font-size:9.5px; font-weight:800; letter-spacing:.04em; color:var(--amber); text-transform:uppercase; margin-right:6px; }
 .ask-answer .close { float:right; background:none; border:0; color:var(--ink3); font-size:14px; cursor:pointer; }
+/* Phase 1 — identity bar (workspace · user · role · sign-out) */
+.userbar { display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:8px 16px; background:var(--card,#fff); border-bottom:1px solid var(--rule,#e8e4df);
+  font-size:12px; position:sticky; top:0; z-index:40; }
+.userbar .ub-proj { font-weight:800; letter-spacing:.02em; color:var(--ink,#161514); }
+.userbar .ub-right { display:flex; align-items:center; gap:8px; }
+.userbar .ub-name { font-weight:600; color:var(--ink2,#57534e); }
+.userbar .ub-role { text-transform:uppercase; font-size:9.5px; font-weight:800;
+  letter-spacing:.05em; padding:2px 7px; border-radius:999px; background:#efece8; color:#57534e; }
+.userbar .ub-role-manager { background:#161514; color:#fff; }
+.userbar .ub-role-presales { background:#e8f0ff; color:#1f4fd6; }
+.userbar .ub-role-ground   { background:#e7f6ec; color:#1a7f47; }
+.userbar .ub-role-agent    { background:#f3e9ff; color:#6b2fd6; }
+.userbar .ub-out { text-decoration:none; color:var(--ink3,#8e8a84); font-size:15px;
+  line-height:1; padding:2px 4px; border-radius:6px; }
+.userbar .ub-out:hover { background:#f0ede9; color:var(--ink,#161514); }
+.userbar .ub-switch { font:inherit; font-size:12px; font-weight:800; color:var(--ink,#161514);
+  border:1px solid var(--rule,#e8e4df); border-radius:8px; padding:3px 6px; background:#fff; cursor:pointer; }
+.userbar .ub-bell { position:relative; text-decoration:none; font-size:14px; line-height:1; padding:1px; }
+.userbar .ub-badge { position:absolute; top:-7px; right:-8px; background:#b3261e; color:#fff;
+  font-size:9px; font-weight:800; min-width:14px; height:14px; line-height:14px; text-align:center;
+  border-radius:999px; padding:0 3px; }
 {% block style %}{% endblock %}
 </style>
 </head>
 <body>
+
+<div class="userbar">
+  {% if is_manager %}
+  <select class="ub-switch" onchange="location.href='/workspace/'+this.value" title="Switch workspace">
+    {% for p in projects %}
+    <option value="{{ p.id }}" {% if active_project and p.id == active_project.id %}selected{% endif %}>{{ p.name }}</option>
+    {% endfor %}
+  </select>
+  {% else %}
+  <span class="ub-proj">{{ active_project.name if active_project else 'Foothold' }}</span>
+  {% endif %}
+  {% if user %}
+  <span class="ub-right">
+    <a class="ub-bell" href="/inbox" title="Notifications">🔔{% if unread_notifs %}<span class="ub-badge">{{ unread_notifs }}</span>{% endif %}</a>
+    <span class="ub-role ub-role-{{ user.role }}">{{ user.role }}</span>
+    <span class="ub-name">{{ user.name }}</span>
+    <a class="ub-out" href="/logout" title="Sign out">⎋</a>
+  </span>
+  {% endif %}
+</div>
 
 <div class="page">
 {% block content %}{% endblock %}
@@ -214,6 +256,10 @@ body.kb-open .cap-fab { bottom:0; }
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>Leads</a>
   <a class="tab {% if active_tab == 'plan' %}on{% endif %}" href="/calendar">
     <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Plan</a>
+  {% if is_manager %}
+  <a class="tab {% if active_tab == 'team' %}on{% endif %}" href="/team">
+    <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.2"/><path d="M4 20c0-3 2.5-5 5-5s5 2 5 5M14.5 20c0-2 1-3.5 2.5-3.5s2.5 1.5 2.5 3.5"/></svg>Team</a>
+  {% endif %}
 </nav>
 
 {% block sheets %}{% endblock %}
@@ -313,18 +359,27 @@ window.addEventListener('pageshow', () => {
     const c=answerBox.querySelector('.close'); if(c) c.addEventListener('click',()=>answerBox.hidden=true);
   }
 
-  // "Which company is this for?" — keep the utterance and resubmit with a choice.
+  // New-lead-first picker: the spoken/typed name is prefilled so voice → new
+  // lead is one tap (existing matches are offered below, not forced).
   function showPicker(origText, suggestions){
     hideAll(); confirmEl.hidden=true; capIn.value='';
+    // Strip lead-add phrasing → the bare name to prefill.
+    const guess=(origText||'')
+      .replace(/^(add|create|make|new|naya|nayi|ek)\s+/i,'')
+      .replace(/^(a\s+)?(new\s+)?(lead|contact|customer|buyer|user|client)\s*/i,'')
+      .replace(/^(named|called|ka\s*naam|naam)\s*/i,'')
+      .split(/[,.]| - | with | budget | phone /i)[0].trim();
     const chips=(suggestions||[]).map(s=>`<button type="button" data-id="${esc(s.id)}">${esc(s.name)}</button>`).join('');
     pickerEl.innerHTML =
-      `<div class="pk-q">Which company is this for?</div>`+
-      `<div class="pk-new"><input id="pk-new-in" placeholder="Type a company — new or existing"><button type="button" id="pk-new-go">Add</button></div>`+
-      (chips?`<div class="pk-chips">${chips}</div>`:``);
+      `<div class="pk-q">Add as a new lead</div>`+
+      `<div class="pk-new"><input id="pk-new-in" placeholder="New lead name"><button type="button" id="pk-new-go">+ Add new</button></div>`+
+      (chips?`<div class="pk-q" style="margin:8px 0 6px;font-weight:600;color:var(--ink3);">…or attach to an existing lead:</div><div class="pk-chips">${chips}</div>`:``);
     pickerEl.hidden=false;
     pickerEl.querySelectorAll('.pk-chips button').forEach(b=>b.addEventListener('click',()=>
       runCapture(origText, {force_company_id:b.dataset.id})));
     const go=pickerEl.querySelector('#pk-new-go'), inp=pickerEl.querySelector('#pk-new-in');
+    inp.value=guess;                                  // prefill the spoken name
+    setTimeout(()=>{ inp.focus(); inp.select(); }, 60);
     const submitNew=()=>{ const v=(inp.value||'').trim(); if(v) runCapture(origText,{force_company_name:v}); };
     go.addEventListener('click',submitNew);
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submitNew(); }});

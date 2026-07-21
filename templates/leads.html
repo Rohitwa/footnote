@@ -53,6 +53,19 @@
   <input id="filter" name="q" placeholder="Filter {{ counts.all }} companies — Enter searches everything" autocomplete="off">
 </form>
 
+<div class="l-import">
+  <button type="button" id="imp-btn">⬆ Import from Excel</button>
+  <a href="/leads/import/template" class="imp-tmpl">Download template</a>
+  <input type="file" id="imp-file" accept=".xlsx" hidden>
+  <span id="imp-status" class="imp-status"></span>
+</div>
+<style>
+.l-import { display:flex; align-items:center; gap:12px; margin:0 0 14px; flex-wrap:wrap; }
+.l-import #imp-btn { border:1px solid var(--rule); background:var(--card); border-radius:10px; padding:8px 13px; font:inherit; font-size:13px; font-weight:700; color:var(--ink); cursor:pointer; }
+.l-import .imp-tmpl { font-size:12px; color:var(--ink3); text-decoration:underline; }
+.l-import .imp-status { font-size:12.5px; font-weight:600; color:#1a7f47; }
+</style>
+
 <div class="seg">
   <a class="s {% if t == 'pipeline' %}on{% endif %}" href="/leads?t=pipeline">Pipeline {{ pipeline_n }}</a>
   <a class="s {% if t == 'hot' %}on{% endif %}" href="/leads?t=hot">Hot {{ counts.get('hot', 0) }}</a>
@@ -86,5 +99,30 @@ document.getElementById('filter').addEventListener('input', (e) => {
     el.style.display = !q || el.dataset.name.includes(q) ? '' : 'none';
   });
 });
+
+// ── Excel import ──
+const impBtn = document.getElementById('imp-btn');
+const impFile = document.getElementById('imp-file');
+const impStatus = document.getElementById('imp-status');
+if (impBtn) {
+  impBtn.addEventListener('click', () => impFile.click());
+  impFile.addEventListener('change', async () => {
+    if (!impFile.files.length) return;
+    impStatus.style.color = '#57534e'; impStatus.textContent = 'Importing…';
+    const fd = new FormData(); fd.append('file', impFile.files[0]);
+    try {
+      const r = await fetch('/leads/import', {method: 'POST', body: fd});
+      const d = await r.json();
+      if (d.ok) {
+        impStatus.style.color = '#1a7f47';
+        impStatus.textContent = `✓ ${d.created} leads imported${d.skipped ? ' · ' + d.skipped + ' skipped' : ''}`;
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        impStatus.style.color = '#b3261e'; impStatus.textContent = d.error || 'Import failed';
+      }
+    } catch (e) { impStatus.style.color = '#b3261e'; impStatus.textContent = 'Upload failed'; }
+    impFile.value = '';
+  });
+}
 </script>
 {% endblock %}

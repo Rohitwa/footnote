@@ -115,6 +115,61 @@
 }
 .actbar button .g { font-size:17px; }
 .actbar button.on { border-color:var(--ink); background:var(--ink); color:#fff; }
+.actbar button:disabled { opacity:.45; cursor:not-allowed; }
+.why-score { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:12px 14px; margin:0 0 14px; }
+.why-score .why-hd { font-size:10px; font-weight:800; letter-spacing:.06em; color:var(--ink3); margin-bottom:8px; }
+.why-row { display:flex; align-items:center; gap:9px; padding:4px 0; font-size:13px; }
+.why-delta { font-weight:800; min-width:34px; text-align:right; }
+.why-delta.up { color:#1a7f47; } .why-delta.down { color:#b3261e; }
+.why-label { flex:1; color:var(--ink); font-weight:600; }
+.why-cat { font-size:9px; text-transform:uppercase; font-weight:800; color:var(--ink3); background:#f0ede9; padding:2px 6px; border-radius:6px; margin-left:4px; }
+.why-hd .why-sub { font-weight:600; letter-spacing:0; text-transform:none; color:var(--ink3); font-size:10px; margin-left:6px; }
+.why-toggle { border:0; background:none; color:var(--ink3); font-size:13px; cursor:pointer; padding:2px 4px; border-radius:6px; }
+.why-toggle:hover { background:#f0ede9; color:var(--ink); }
+.why-row.off { opacity:.4; }
+.why-row.off .why-delta { text-decoration:line-through; }
+.stepper button:disabled { opacity:.5; cursor:not-allowed; }
+.readonly-note { background:#f3e9ff; color:#6b2fd6; border:1px solid #e4d4ff;
+  border-radius:13px; padding:11px 13px; font-size:12.5px; font-weight:600; margin-bottom:14px; }
+.handoff { margin:0 0 14px; text-align:center; }
+.handoff button { width:100%; padding:13px; border:0; border-radius:13px;
+  background:#1a7f47; color:#fff; font-size:14px; font-weight:800; cursor:pointer; }
+.handoff button:hover { background:#166b3c; }
+.handoff small { display:block; margin-top:6px; color:var(--ink3); font-size:11px; }
+.wa-compose { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:12px 14px; margin:0 0 14px; }
+.wa-compose .wc-hd { font-size:10px; font-weight:800; letter-spacing:.05em; color:var(--ink3); margin-bottom:9px; }
+.wa-compose textarea { width:100%; box-sizing:border-box; border:1px solid var(--rule); border-radius:10px; padding:10px; font:inherit; font-size:13.5px; resize:vertical; color:var(--ink); background:#fff; }
+.wc-tools { display:flex; gap:7px; margin:9px 0; flex-wrap:wrap; }
+.wc-tools button, .wc-tools select { border:1px solid var(--rule); background:#fff; border-radius:9px; font:inherit; font-size:12px; font-weight:700; padding:7px 10px; cursor:pointer; color:var(--ink); }
+.wc-send { width:100%; border:0; border-radius:11px; background:#1a7f47; color:#fff; font-weight:800; font-size:14px; padding:11px; cursor:pointer; }
+.wc-status { margin-top:8px; font-size:12px; font-weight:600; color:var(--ink3); }
+.sm-tools { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:12px 14px; margin:0 0 14px; }
+.sm-row { display:flex; gap:8px; }
+.sm-row button { flex:1; border:1px solid var(--rule); background:#fff; border-radius:11px; font:inherit; font-size:13px; font-weight:700; padding:11px 0; cursor:pointer; color:var(--ink); }
+.sm-tools small { display:block; margin-top:8px; color:var(--ink3); font-size:11px; }
+.call-numbers { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:12px 14px; margin:0 0 14px; }
+.call-numbers .cn-hd { font-size:10px; font-weight:800; letter-spacing:.05em; color:var(--ink3); margin-bottom:10px; }
+.cn-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px solid var(--rule); }
+.cn-row:first-of-type { border-top:0; }
+.cn-info { flex:1; font-size:13px; color:var(--ink2); } .cn-info b { color:var(--ink); }
+.cn-call { border:0; border-radius:10px; background:#1a7f47; color:#fff; font-weight:800; font-size:12px; padding:7px 11px; cursor:pointer; white-space:nowrap; }
+.cn-call:disabled { opacity:.5; }
+.cn-del { border:0; background:none; color:var(--ink3); font-size:14px; cursor:pointer; padding:4px; }
+.cn-add { display:flex; gap:6px; margin-top:10px; }
+.cn-add input { flex:1; min-width:0; font:inherit; font-size:12.5px; padding:8px 10px; border:1px solid var(--rule); border-radius:9px; background:#fff; }
+.cn-add input:last-of-type { flex:0 0 34%; }
+.cn-add button { border:0; border-radius:9px; background:var(--ink); color:#fff; font-weight:700; padding:8px 12px; cursor:pointer; }
+.cn-status { margin-top:9px; font-size:12.5px; font-weight:600; color:#1a7f47; }
+.outcome-box { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:12px 14px; margin:0 0 14px; }
+.outcome-box .ob-hd { font-size:10px; font-weight:800; letter-spacing:.05em; color:var(--ink3); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+.outcome-box .ob-learn { font-weight:700; letter-spacing:0; color:#6b2fd6; background:#f3e9ff; padding:2px 8px; border-radius:999px; text-transform:none; }
+.ob-row { display:flex; gap:7px; }
+.ob-btn { flex:1; border:1px solid var(--rule); border-radius:11px; background:#fff; font:inherit; font-size:12.5px; font-weight:700; padding:9px 0; cursor:pointer; color:var(--ink2); }
+.ob-btn.won { border-color:#1a7f47; color:#1a7f47; } .ob-btn.won:hover { background:#e7f6ec; }
+.ob-btn.lost { border-color:#b3261e; color:#b3261e; } .ob-btn.lost:hover { background:#fde8e8; }
+.ob-btn.ev:hover { background:#f0ede9; }
+.outcome-box small { display:block; margin-top:8px; color:var(--ink3); font-size:11px; }
+.ob-status { margin-top:8px; font-size:12.5px; font-weight:600; color:#1a7f47; }
 .composer { background:var(--card); border:1px solid var(--rule); border-radius:14px;
   padding:14px; margin-bottom:14px; display:none; }
 .composer.open { display:block; }
@@ -228,6 +283,10 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
     <div class="v" style="color:{% if rk.score and rk.score >= 70 %}var(--green){% elif rk.score and rk.score >= 40 %}var(--amber){% else %}var(--ink3){% endif %};">
       {{ rk.score if rk.score is defined else '—' }}<span style="font-size:11px;color:var(--ink3);">/100</span></div>
     {% if rk.score is defined %}<div class="score-tag" style="color:{% if rk.score >= 70 %}var(--green){% elif rk.score >= 40 %}var(--amber){% else %}var(--ink3){% endif %};">{% if rk.score >= 70 %}strong — push now{% elif rk.score >= 40 %}warming{% else %}cold{% endif %}</div>{% endif %}</div>
+  {% if is_realestate %}
+  <div><div class="k">BUDGET · CONFIG</div>
+    <div class="v" style="font-size:13px;">{{ co.sector or '—' }}</div></div>
+  {% else %}
   <div><div class="k">FY26 PAT</div>
     <div class="v {% if co.fy26_pat and '-' in co.fy26_pat %}neg{% elif co.fy26_pat %}pos{% endif %}" style="font-size:15px;">{{ co.fy26_pat or '—' }}</div></div>
   <div class="temp-pick">
@@ -235,20 +294,37 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
     <button data-temp="warm" class="{% if co.temperature == 'warm' %}on{% endif %}" title="Warm">🌤</button>
     <button data-temp="hot"  class="{% if co.temperature == 'hot'  %}on{% endif %}" title="Hot">🔥</button>
   </div>
+  {% endif %}
 </div>
 {% if rk.going_cold %}<span class="cold-flag">🔥 GOING COLD — re-engage</span>{% endif %}
 
+{# WHY-THIS-SCORE now lives inside the Profile/Background tab (see below). #}
+{% macro why_score_panel() %}
+{% if score_signals %}
+<div class="why-score">
+  <div class="why-hd">WHY THIS SCORE <span class="why-sub">BANT · tap ✕ to drop a signal</span></div>
+  {% for s in score_signals %}
+  <div class="why-row {% if not s.active %}off{% endif %}" data-sig="{{ s.id }}">
+    <span class="why-delta {{ 'up' if s.delta >= 0 else 'down' }}">{{ '+' if s.delta >= 0 else '' }}{{ s.delta }}</span>
+    <span class="why-label">{{ s.label }}{% if s.category %} <span class="why-cat">{{ s.category }}</span>{% endif %}</span>
+    <button type="button" class="why-toggle" data-sig="{{ s.id }}">{{ '↺' if not s.active else '✕' }}</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
 <div class="stepper">
   {% for s in ['contacted', 'meeting', 'poc', 'won'] %}
-  <button data-stage="{{ s }}"
+  <button data-stage="{{ s }}" {% if not can_status | default(true) %}disabled title="Your role can’t change the stage"{% endif %}
     class="{% if co.status == s %}{% if s == 'won' %}won-on{% else %}on{% endif %}{% elif STAGE_ORDER.get(co.status, 1) > STAGE_ORDER.get(s, 1) or co.status == 'won' %}done{% endif %}">
     {{ s | upper }}</button>
   {% endfor %}
 </div>
 
 <div class="d-tabs">
-  <button type="button" class="{% if tab == 'memory' %}on{% endif %}" data-tab="memory">Memory</button>
-  <button type="button" class="{% if tab == 'background' %}on{% endif %}" data-tab="background">Background</button>
+  <button type="button" class="{% if tab == 'memory' %}on{% endif %}" data-tab="memory">{{ tab_memory_label | default('Memory') }}</button>
+  <button type="button" class="{% if tab == 'background' %}on{% endif %}" data-tab="background">{{ tab_background_label | default('Background') }}</button>
 </div>
 
 <div class="tabpane" data-pane="memory" {% if tab != 'memory' %}hidden{% endif %}>
@@ -294,13 +370,102 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
   </button>
   {% endif %}
 
-  {# ── action bar ── #}
+  {# ── action bar (hidden for read-only roles e.g. agent) ── #}
+  {% if can_write | default(true) %}
   <div class="actbar">
     <button data-act="call"><span class="g">📞</span>Call</button>
     <button data-act="whatsapp"><span class="g">💬</span>WhatsApp</button>
     <button data-act="meeting"><span class="g">🤝</span>Meeting</button>
     <button data-act="email"><span class="g">✉</span>Email</button>
   </div>
+  {% else %}
+  <div class="readonly-note">👁 Read-only — you can add context notes below, but outreach is handled by the sales tiers.</div>
+  {% endif %}
+
+  {# ── AI compose: draft a WhatsApp, fix grammar, attach a brochure ── #}
+  {% if can_write | default(true) %}
+  <div class="wa-compose" id="wa-compose">
+    <div class="wc-hd">✨ WHATSAPP — AI ASSIST</div>
+    <textarea id="wc-text" rows="4" placeholder="Tap ‘Draft with AI’, or type your message…"></textarea>
+    <div class="wc-tools">
+      <button type="button" id="wc-draft">✨ Draft with AI</button>
+      <button type="button" id="wc-grammar">✔ Fix grammar</button>
+      <select id="wc-broch"><option value="">📎 Attach brochure…</option></select>
+    </div>
+    <button type="button" id="wc-send" class="wc-send">Send on WhatsApp →</button>
+    <div id="wc-status" class="wc-status" hidden></div>
+  </div>
+  {% endif %}
+
+  {# ── Salesman tools: bridge-and-record call + on-visit voice note (P4) ── #}
+  {% if is_salesman %}
+  <div class="sm-tools" id="sm-tools">
+    <div class="wc-hd">📍 SALESMAN TOOLS</div>
+    <div class="sm-row">
+      <button type="button" id="sm-bridge">📞 Call &amp; record (bridge)</button>
+      <button type="button" id="sm-visit">🎙 Record visit</button>
+    </div>
+    <small>Bridge connects your phone to the buyer + records; visit note transcribes on-device speech into the Lead Brain.</small>
+    <div id="sm-status" class="wc-status" hidden></div>
+  </div>
+  {% endif %}
+
+  {# ── Handoff: pre-sales → ground (only for a qualified, pre-sales-owned lead) ── #}
+  {% if can_handoff %}
+  <form class="handoff" method="post" action="/targets/{{ co.id }}/handoff"
+        onsubmit="return confirm('Share this lead with the salesman (Mohit)? Full context travels; it moves to their pipeline.');">
+    <input type="hidden" name="summary"
+           value="Score {{ rk.score }} · {{ co.sector }} · {{ co.temperature | upper }}. {{ (co.spine or '') | truncate(90) }}">
+    <button type="submit">↪ Share with salesman (Mohit)</button>
+    <small>Passes the full context + score forward; the lead moves to the salesman.</small>
+  </form>
+  {% endif %}
+
+  {% if can_share_broker %}
+  <form class="handoff" method="post" action="/targets/{{ co.id }}/share-broker"
+        onsubmit="return confirm('Share this lead with the broker? They get the full context; you keep working it.');">
+    <input type="hidden" name="broker_id" value="broker">
+    <input type="hidden" name="summary"
+           value="Score {{ rk.score }} · {{ co.sector }}. {{ (co.spine or '') | truncate(90) }}">
+    <button type="submit" style="background:#6b2fd6;">↪ Share with broker</button>
+    <small>Tags the lead to the broker (full context) — you keep it in your pipeline.</small>
+  </form>
+  {% endif %}
+
+  {# ── AI call: designate numbers, call each, context drives the score ── #}
+  {% if can_write | default(true) %}
+  <div class="call-numbers" id="numbers">
+    <div class="cn-hd">☎ AI CALL — DESIGNATED NUMBERS</div>
+    {% for n in lead_numbers %}
+    <div class="cn-row">
+      <span class="cn-info"><b>{{ n.label or 'Number' }}</b> · {{ n.phone }}</span>
+      <button type="button" class="cn-call" data-phone="{{ n.phone }}">📞 AI Call</button>
+      <button type="button" class="cn-del" data-num="{{ n.id }}" title="Remove">✕</button>
+    </div>
+    {% endfor %}
+    <form class="cn-add" method="post" action="/targets/{{ co.id }}/numbers">
+      <input name="phone" placeholder="+91 98xxxxxxxx" inputmode="tel" required>
+      <input name="label" placeholder="Label (Wife, Office…)">
+      <button type="submit">+ Add</button>
+    </form>
+    <div id="cn-status" class="cn-status" hidden></div>
+  </div>
+  {% endif %}
+
+  {# ── close the loop: outcome teaches the scoring + recommendation engines ── #}
+  {% if can_write | default(true) %}
+  <div class="outcome-box" id="outcome">
+    <div class="ob-hd">CLOSE THE LOOP
+      <span class="ob-learn">{{ train_stats.total if train_stats else 0 }} outcomes learned</span></div>
+    <div class="ob-row">
+      <button type="button" class="ob-btn ev" data-event="site_visit">📅 Visit done</button>
+      <button type="button" class="ob-btn won" data-outcome="won">✅ Booked</button>
+      <button type="button" class="ob-btn lost" data-outcome="lost">✕ Lost</button>
+    </div>
+    <small>Each booked / lost result snapshots this lead → the engines learn what actually closes.</small>
+    <div id="ob-status" class="ob-status" hidden></div>
+  </div>
+  {% endif %}
 
   {# ── contact channels (targets for the rec + action buttons) ── #}
   <details class="contact-ed" id="contact-ed">
@@ -358,9 +523,24 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
 
 </div>
 <div class="tabpane" data-pane="background" {% if tab != 'background' %}hidden{% endif %}>
+  {% if is_realestate %}
+  {# ── Buyer profile — who this lead is (real-estate) ── #}
+  <div class="card" style="padding:14px 16px;">
+    <div class="lbl" style="margin-bottom:10px;">BUYER PROFILE</div>
+    <div style="display:grid;grid-template-columns:104px 1fr;row-gap:9px;font-size:13px;align-items:baseline;">
+      <div style="color:var(--ink3);">Looking for</div><div>{{ co.sector or '—' }}</div>
+      <div style="color:var(--ink3);">Stage</div><div>{{ co.status | upper }}</div>
+      {% if contact.phone %}<div style="color:var(--ink3);">Phone</div><div style="font-family:var(--mono);">{{ contact.phone }}</div>{% endif %}
+      {% if lead_numbers %}<div style="color:var(--ink3);">Call numbers</div><div style="font-family:var(--mono);">{% for n in lead_numbers %}{{ n.phone }}{% if n.label %} · {{ n.label }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}</div>{% endif %}
+      {% if contact.email %}<div style="color:var(--ink3);">Email</div><div>{{ contact.email }}</div>{% endif %}
+      <div style="color:var(--ink3);">Owner</div><div>{{ co.owner_role | capitalize }}</div>
+    </div>
+  </div>
+  {% endif %}
+  {{ why_score_panel() }}
   {% set has_case = co.leak or co.lever or co.spine %}
   {% set has_numbers = co.fy26_pat or co.fy26_yoy or co.latest_qtr or co.stock_drawdown or quarterly %}
-  {% if not has_case and not has_numbers %}
+  {% if not has_case and not has_numbers and not is_realestate %}
   <div class="bg-empty">
     <div class="t">This lead isn't fully researched yet</div>
     <div class="s">Its case, financials and signals haven't been filled in. Run AI research below to populate them.</div>
@@ -418,6 +598,7 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
   </div>
   {% endif %}
 
+  {% if not is_realestate %}
   <div class="sec-head"><h2>RESEARCH</h2></div>
   {% if co.research_status == 'researching' or co.research_status == 'requested' %}
   <button class="air-card running" id="air-btn" data-company="{{ co.id }}">
@@ -441,6 +622,7 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
   </details>
   {% else %}<div class="quiet">No research entries yet — the button above writes the first one.</div>{% endfor %}
   </div>
+  {% endif %}
 
   <div class="sec-head"><h2>DOCUMENTS</h2></div>
   <div class="card">
@@ -487,6 +669,58 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
   const CID = "{{ co.id }}";
   window.FOOTHOLD_CID = CID;   // the app-wide capture bar (app_base) logs to this lead
 
+  // ── AI call per designated number ──
+  document.querySelectorAll('.cn-call').forEach(b => b.addEventListener('click', async () => {
+    const phone = b.dataset.phone;
+    const st = document.getElementById('cn-status');
+    st.hidden = false; st.style.color = '#1a7f47';
+    st.textContent = '📞 Calling ' + phone + '…'; b.disabled = true;
+    try {
+      const fd = new FormData(); fd.append('phone', phone);
+      const r = await fetch(`/targets/${CID}/call/start`, {method: 'POST', body: fd});
+      const d = await r.json();
+      st.textContent = d.message || d.error || 'Call placed.';
+      if (d.error) st.style.color = '#b3261e';
+    } catch (e) { st.textContent = 'Call failed — try again.'; st.style.color = '#b3261e'; }
+    setTimeout(() => { b.disabled = false; }, 4000);
+  }));
+  document.querySelectorAll('.cn-del').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Remove this number?')) return;
+    await fetch(`/api/numbers/${b.dataset.num}/delete`, {method: 'POST'});
+    b.closest('.cn-row').remove();
+  }));
+
+  // ── ✓/✗ curate a score signal (adaptive Way 2) — reload to refresh the score ──
+  document.querySelectorAll('.why-toggle').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    try { await fetch(`/api/signals/${b.dataset.sig}/toggle`, {method: 'POST'}); location.reload(); }
+    catch (e) { b.disabled = false; }
+  }));
+
+  // ── Close the loop: outcome + funnel event → training data (P-A) ──
+  document.querySelectorAll('.ob-btn[data-outcome]').forEach(b => b.addEventListener('click', async () => {
+    const o = b.dataset.outcome;
+    if (!confirm('Mark this lead as ' + o.toUpperCase() + '? This snapshots it to train the engines.')) return;
+    const fd = new FormData(); fd.append('outcome', o);
+    await fetch(`/targets/${CID}/outcome`, {method: 'POST', body: fd});
+    location.reload();
+  }));
+  document.querySelectorAll('.ob-btn[data-event]').forEach(b => b.addEventListener('click', async () => {
+    const fd = new FormData(); fd.append('outcome', b.dataset.event);
+    await fetch(`/targets/${CID}/outcome`, {method: 'POST', body: fd});
+    const st = document.getElementById('ob-status');
+    st.hidden = false; st.textContent = '✓ ' + b.dataset.event.replace('_', ' ') + ' logged';
+  }));
+  // ── Log which recommendation the salesman acts on (recommendation feedback) ──
+  document.querySelectorAll('.rec-go').forEach(b => b.addEventListener('click', () => {
+    const fd = new FormData();
+    fd.append('company_id', CID);
+    fd.append('suggestion_id', b.dataset.sid || 0);
+    fd.append('action', (b.querySelector('.lbl') || {}).textContent || '');
+    fd.append('taken', 1);
+    fetch('/api/moves/feedback', {method: 'POST', body: fd});   // fire-and-forget
+  }));
+
   // ── instant tab switching (both panes are pre-rendered; no round-trip) ──
   const tabBtns = document.querySelectorAll('.d-tabs button');
   const panes = document.querySelectorAll('.tabpane');
@@ -525,6 +759,81 @@ details.rlog[open] summary::after { transform:rotate(-90deg); }
   });
   // ── recommendation: channel button → open the right app + log + advance ──
   const CONTACT = {{ contact | tojson }};
+
+  // ── AI WhatsApp compose (draft · grammar · brochure · send) ──
+  (function(){
+    const box=document.getElementById('wa-compose'); if(!box) return;
+    const ta=document.getElementById('wc-text'), st=document.getElementById('wc-status');
+    const setStatus=(m,c)=>{ st.hidden=!m; st.textContent=m||''; st.style.color=c||'var(--ink3)'; };
+    document.getElementById('wc-draft').addEventListener('click', async (e)=>{
+      e.target.disabled=true; setStatus('Drafting…');
+      try{ const r=await fetch(`/targets/${CID}/ai/draft-wa`,{method:'POST'}); const d=await r.json();
+        ta.value=d.text||''; setStatus(d.text?'✓ Draft ready — edit + send':'Draft failed','#1a7f47'); }
+      catch(_){ setStatus('Draft failed','#b3261e'); } e.target.disabled=false;
+    });
+    document.getElementById('wc-grammar').addEventListener('click', async (e)=>{
+      if(!ta.value.trim()){ setStatus('Type or draft a message first'); return; }
+      e.target.disabled=true; setStatus('Fixing…');
+      try{ const fd=new FormData(); fd.append('text',ta.value);
+        const r=await fetch('/ai/grammar',{method:'POST',body:fd}); const d=await r.json();
+        if(d.text) ta.value=d.text; setStatus('✓ Grammar fixed','#1a7f47'); }
+      catch(_){ setStatus('Failed','#b3261e'); } e.target.disabled=false;
+    });
+    fetch('/api/brochures').then(r=>r.json()).then(list=>{
+      const sel=document.getElementById('wc-broch');
+      (list||[]).forEach(b=>{ const o=document.createElement('option'); o.value=b.url; o.textContent='📎 '+b.name; sel.appendChild(o); });
+    }).catch(()=>{});
+    document.getElementById('wc-broch').addEventListener('change',(e)=>{
+      if(!e.target.value) return;
+      const name=e.target.options[e.target.selectedIndex].textContent.replace('📎 ','');
+      ta.value=(ta.value.trim()+`\n\n${name}: ${e.target.value}`).trim();
+      e.target.value=''; setStatus('📎 Brochure link added','#1a7f47');
+    });
+    document.getElementById('wc-send').addEventListener('click',()=>{
+      const num=(CONTACT.wa||CONTACT.phone||'').replace(/[^0-9]/g,'');
+      if(!num){ setStatus('No WhatsApp number on this lead','#b3261e'); return; }
+      window.open('https://wa.me/'+num+'?text='+encodeURIComponent(ta.value),'_blank');
+      const fd=new FormData(); fd.append('kind','whatsapp'); fd.append('direction','out'); fd.append('notes',ta.value.slice(0,300));
+      fetch(`/targets/${CID}/comms`,{method:'POST',body:fd});   // log the sent message
+      setStatus('✓ Opened WhatsApp — message logged','#1a7f47');
+    });
+  })();
+
+  // ── Salesman tools: bridge call + on-visit voice note ──
+  (function(){
+    const box=document.getElementById('sm-tools'); if(!box) return;
+    const st=document.getElementById('sm-status');
+    const set=(m,c)=>{ st.hidden=!m; st.textContent=m||''; st.style.color=c||'var(--ink3)'; };
+    document.getElementById('sm-bridge').addEventListener('click', async (e)=>{
+      e.target.disabled=true; set('Placing bridge call…');
+      try{ const r=await fetch(`/targets/${CID}/call/bridge`,{method:'POST'}); const d=await r.json();
+        set(d.message||d.error||'', d.error?'#b3261e':'#1a7f47'); }
+      catch(_){ set('Failed','#b3261e'); } setTimeout(()=>e.target.disabled=false,3000);
+    });
+    let rec=null, chunks=[]; const vb=document.getElementById('sm-visit');
+    vb.addEventListener('click', async ()=>{
+      if(rec && rec.state==='recording'){ rec.stop(); return; }
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
+        rec=new MediaRecorder(stream,{mimeType:mime}); chunks=[];
+        rec.addEventListener('dataavailable',e=>{ if(e.data&&e.data.size) chunks.push(e.data); });
+        rec.addEventListener('stop', async ()=>{
+          vb.textContent='🎙 Record visit'; stream.getTracks().forEach(t=>t.stop());
+          const blob=new Blob(chunks,{type:mime});
+          if(blob.size<800){ set('Too short — try again','#b3261e'); return; }
+          set('Transcribing…');
+          const fd=new FormData(); fd.append('audio',blob,'visit.webm');
+          try{ const r=await fetch(`/targets/${CID}/visit-capture`,{method:'POST',body:fd}); const d=await r.json();
+            if(d.transcript){ set('✓ Logged: '+d.transcript.slice(0,60),'#1a7f47'); setTimeout(()=>location.reload(),1600); }
+            else set(d.error||'Failed','#b3261e'); }
+          catch(_){ set('Upload failed','#b3261e'); }
+        });
+        rec.start(); vb.textContent='⏹ Stop'; set('Recording… tap Stop when done','#b3261e');
+      }catch(_){ set('Allow mic access','#b3261e'); }
+    });
+  })();
+
   function channelLink(ch) {
     if (ch === 'call' && CONTACT.phone) return 'tel:' + CONTACT.phone.replace(/[^0-9+]/g,'');
     if (ch === 'whatsapp' && CONTACT.wa) return 'https://wa.me/' + CONTACT.wa.replace(/[^0-9]/g,'');

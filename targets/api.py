@@ -28,8 +28,15 @@ import re
 import difflib
 from typing import Dict, Any
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File, Body
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi.responses import (HTMLResponse, RedirectResponse, JSONResponse,
+                               FileResponse, Response, PlainTextResponse)
 from fastapi.templating import Jinja2Templates
+import os as _os_voice
+import requests as _requests
+
+from targets import voice_agent
+from targets import ingest
+from targets import ai_actions
 
 try:
     import markdown as _md
@@ -86,12 +93,28 @@ def create_app() -> FastAPI:
     app = FastAPI(title="NCR Distressed Targets", version="0.3")
 
     # ─── Project context — every template gets active_project + projects ──
+    def _active_pid(request: Request) -> str:
+        """Effective workspace. Non-managers are pinned to their own project;
+        a manager may switch workspaces via the foothold_active cookie."""
+        user = getattr(request.state, "user", None)
+        if not user:
+            return request.cookies.get("foothold_active") or "foothold"
+        if user["role"] == "manager":
+            chosen = request.cookies.get("foothold_active")
+            if chosen and tdb.get_project(chosen):
+                return chosen
+        return user["project_id"]
+
     def _project_ctx(request: Request) -> dict:
-        pid = request.cookies.get("foothold_active") or "foothold"
+        user = getattr(request.state, "user", None)
+        pid = _active_pid(request)
         proj = tdb.get_project(pid) or tdb.get_project("foothold")
         return {
             "active_project": proj,
             "projects": tdb.list_projects(),
+            "user": user,
+            "is_manager": bool(user and user["role"] == "manager"),
+            "unread_notifs": tdb.unread_count(user["id"]) if user else 0,
         }
 
     templates = Jinja2Templates(
@@ -103,17 +126,17 @@ def create_app() -> FastAPI:
     app.include_router(api_v1.health_router)
     app.include_router(api_v1.router)
 
-    # ── HTML auth gate (Phase 3 — public deploy) ───────────────────────
-    # Cloud-only: active when running on Fly (FLY_APP_NAME is set by the
-    # platform). The token also lives in local .env for deploy purposes, so
-    # we must NOT key the gate off the token alone — that walls off local dev.
-    # /api/v1 has its own bearer auth; /login is open.
-    import os as _os
+    # ── Per-user auth (Phase 1 — accounts + role tiers) ────────────────
+    # Numeric-ID accounts backed by target_users (login_id is the whole
+    # credential; the future admin dashboard mints them); a random
+    # session token (foothold_session cookie) resolves to the logged-in user
+    # on every request. Always on (localhost included). /api/v1 keeps its own
+    # bearer auth and is exempt here.
+    SESSION_COOKIE = "foothold_session"
+    _PUBLIC_PATHS = {"/login", "/logout", "/favicon.ico", "/healthz"}
 
-    _AUTH_ACTIVE = bool(_os.environ.get("FLY_APP_NAME"))
-
-    def _expected_token() -> str:
-        return _os.environ.get("FOOTHOLD_TOKEN", "").strip() if _AUTH_ACTIVE else ""
+    def _current_user(request: Request):
+        return tdb.get_user_by_session(request.cookies.get(SESSION_COOKIE, ""))
 
     LOGIN_PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -129,37 +152,118 @@ button{width:100%;font:inherit;font-weight:700;padding:10px;border-radius:8px;
 border:0;background:#161514;color:#fff;cursor:pointer;}
 .err{color:#b3261e;font-size:12px;margin-bottom:10px;}</style></head><body>
 <form method="post" action="/login">
-<h1>Foothold</h1><p>YantrAI · enter your access token</p>
-{err}<input type="password" name="token" placeholder="Access token" autofocus>
+<h1>Foothold</h1><p>YantrAI · enter your Foothold ID</p>
+{err}<input type="text" name="login_id" placeholder="Foothold ID" inputmode="numeric"
+ pattern="[0-9]*" autocomplete="off" autofocus>
 <button type="submit">Sign in</button></form></body></html>"""
 
     @app.get("/login", response_class=HTMLResponse)
-    async def login_page():
+    async def login_page(request: Request):
+        if _current_user(request):
+            return RedirectResponse("/today", status_code=303)
         return HTMLResponse(LOGIN_PAGE.replace("{err}", ""))
 
     @app.post("/login")
-    async def login_submit(token: str = Form("")):
-        expected = _expected_token()
-        if expected and token.strip() == expected:
+    async def login_submit(login_id: str = Form("")):
+        user = tdb.get_user_by_login_id(login_id)
+        if user:
+            token = tdb.create_session(user["id"])
             resp = RedirectResponse("/today", status_code=303)
-            resp.set_cookie("foothold_auth", token.strip(),
-                            max_age=60 * 60 * 24 * 365, httponly=True,
+            resp.set_cookie(SESSION_COOKIE, token,
+                            max_age=60 * 60 * 24 * 30, httponly=True,
                             samesite="lax")
+            # Pin the active workspace to the user's project.
+            resp.set_cookie("foothold_active", user["project_id"],
+                            max_age=60 * 60 * 24 * 30, samesite="lax")
             return resp
         return HTMLResponse(
-            LOGIN_PAGE.replace("{err}", '<div class="err">Wrong token.</div>'),
+            LOGIN_PAGE.replace("{err}", '<div class="err">Unknown Foothold ID.</div>'),
             status_code=401)
 
+    @app.get("/logout")
+    @app.post("/logout")
+    async def logout(request: Request):
+        tdb.delete_session(request.cookies.get(SESSION_COOKIE, ""))
+        resp = RedirectResponse("/login", status_code=303)
+        resp.delete_cookie(SESSION_COOKIE)
+        resp.delete_cookie("foothold_active")
+        return resp
+
+    import re as _re
+
+    def _classify_write(path: str):
+        """Map a mutating request path → (action, company_id|None) for the
+        Phase-3 role gate. action=None means 'not a gated write'."""
+        m = _re.match(r"^/targets/([^/]+)/(.+)$", path)
+        if m:
+            cid, sub = m.group(1), m.group(2)
+            if sub == "notes":
+                return ("note", cid)
+            if sub == "status":
+                return ("status", cid)
+            if sub == "handoff":
+                return ("handoff", cid)
+            if sub == "share-broker":
+                return ("share", cid)
+            if sub.startswith("followups"):
+                return ("followup", cid)
+            if sub == "ask" or sub.startswith("suggest") or sub.startswith("research"):
+                return ("research", cid)
+            # comms, temperature, capture/*, contact, artifacts
+            return ("work", cid)
+        if path.startswith("/followups/") or path.startswith("/api/followups/"):
+            return ("followup", None)
+        if (path.startswith("/api/comms/") or path.startswith("/api/numbers/")
+                or path.startswith("/api/signals/") or path.startswith("/api/moves/")):
+            return ("work", None)
+        if path.startswith("/api/notes/"):
+            return ("note", None)
+        if path.startswith("/ai/"):
+            return ("research", None)
+        if path.startswith("/capture/") or path == "/api/companies":
+            return ("work", None)
+        return (None, None)
+
     @app.middleware("http")
-    async def html_auth_gate(request: Request, call_next):
-        expected = _expected_token()
+    async def session_auth_gate(request: Request, call_next):
         path = request.url.path
-        if (expected
-                and not path.startswith("/api/v1")
-                and path not in ("/login", "/favicon.ico")
-                and request.cookies.get("foothold_auth", "") != expected):
+        request.state.user = None
+        if (path.startswith("/api/v1") or path.startswith("/static")
+                or path.startswith("/voice")   # Twilio voice webhooks (public)
+                or path in _PUBLIC_PATHS):
+            return await call_next(request)
+        user = _current_user(request)
+        if not user:
             return RedirectResponse("/login", status_code=303)
-        return await call_next(request)
+        request.state.user = user
+        # Phase 3 — role-based write gate. Reads flow through per-view scoping;
+        # mutations are checked here in one place.
+        gated = (None, None)
+        if request.method == "POST":
+            gated = _classify_write(path)
+            action, cid = gated
+            if action:
+                role = user["role"]
+                if not tdb.role_can(role, action):
+                    return JSONResponse(
+                        {"error": f"Your role ({role}) can’t perform this action."},
+                        status_code=403)
+                if cid:
+                    vis = tdb.visible_company_ids(user["project_id"], role, user["id"])
+                    if vis is not None and cid not in vis:
+                        return JSONResponse(
+                            {"error": "This lead isn’t in your workspace."},
+                            status_code=403)
+        response = await call_next(request)
+        # Phase 4 — log the action once it actually succeeded (activity feed
+        # powers the manager's 'is the rep working' scorecard).
+        action, cid = gated
+        if action and response.status_code < 400:
+            try:
+                tdb.log_activity(user["id"], user["role"], action, cid, _active_pid(request))
+            except Exception:  # noqa: BLE001 — telemetry must never break a write
+                pass
+        return response
 
     # First call: create tables + seed if empty.
     tdb.ensure_schema()
@@ -207,14 +311,20 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
         tomorrow = today + _td(days=1)
         week_end = today + _td(days=6)  # today + 6 = a 7-day window
 
+        u = request.state.user
+        pid = _active_pid(request)
+        vis = tdb.visible_company_ids(pid, u["role"], u["id"])
+        def _vis(items):
+            return items if vis is None else [x for x in items if x.get("company_id") in vis]
         # Pull the windows — INCLUDING done items so the user sees their work.
-        overdue   = tdb.list_followups_overdue(today.isoformat())
-        today_fu  = tdb.list_followups_window_all_status(today.isoformat(), today.isoformat())
-        tomorrow_fu = tdb.list_followups_window_all_status(tomorrow.isoformat(), tomorrow.isoformat())
-        week_fu   = tdb.list_followups_window_all_status(
+        overdue   = _vis(tdb.list_followups_overdue(today.isoformat(), project_id=pid))
+        today_fu  = _vis(tdb.list_followups_window_all_status(today.isoformat(), today.isoformat(), project_id=pid))
+        tomorrow_fu = _vis(tdb.list_followups_window_all_status(tomorrow.isoformat(), tomorrow.isoformat(), project_id=pid))
+        week_fu   = _vis(tdb.list_followups_window_all_status(
             (tomorrow + _td(days=1)).isoformat(),
             week_end.isoformat(),
-        )
+            project_id=pid,
+        ))
 
         # Group "rest of week" by day for the collapsed view.
         rest_of_week_by_day = {}
@@ -229,8 +339,8 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
             for d in sorted(rest_of_week_by_day.keys())
         ]
 
-        catalog = tdb.list_companies_catalog()
-        captures = tdb.list_recent_captures(limit=20)
+        catalog = tdb.list_companies_catalog(project_id=pid)
+        captures = _vis(tdb.list_recent_captures(limit=20, project_id=pid))
         # Decorate each capture with parsed task count + a short snippet.
         for c in captures:
             try:
@@ -259,29 +369,47 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
     # ─── Leads (the company list) ─────────────────────────────────────
     @app.get("/leads", response_class=HTMLResponse)
     async def leads_list(request: Request, t: str = "all"):
-        rows = tdb.list_companies()
-        if t == "pipeline":
-            rows = [r for r in rows if r["status"] in ("contacted", "meeting", "poc", "won")]
-        elif t == "hot":
-            rows = [r for r in rows if r["temperature"] == "hot"]
+        u = request.state.user
+        pid = _active_pid(request)
+        base = tdb.list_companies(project_id=pid)
+        vis = tdb.visible_company_ids(pid, u["role"], u["id"])
+        if vis is not None:
+            base = [r for r in base if r["id"] in vis]
+        # Classification follows the intent SCORE (the source of truth), not the
+        # stale temperature field: hot ≥70, warm ≥40, else cold.
         researched = tdb.companies_with_verticals()
         rankings = tdb.lead_rankings()
-        for r in rows:
-            r["has_research"] = r["id"] in researched
+
+        def _band(s):
+            return "hot" if s >= 70 else ("warm" if s >= 40 else "cold")
+
+        for r in base:
             rk = rankings.get(r["id"], {})
+            r["has_research"] = r["id"] in researched
             r["glyph"] = rk.get("glyph", "stale")
             r["going_cold"] = rk.get("going_cold", False)
             r["score"] = rk.get("score", 0)
             r["_m"] = rk.get("momentum", 0.0)
+            r["temperature"] = _band(r["score"])   # score-derived Hot/Warm/Cold
+        # Tab badges + pipeline count reflect the role's full visible set.
+        counts = {"hot": 0, "warm": 0, "cold": 0}
+        for r in base:
+            counts[r["temperature"]] = counts.get(r["temperature"], 0) + 1
+        counts["all"] = len(base)
+        pipeline_n = sum(1 for r in base
+                         if r["status"] in ("contacted", "meeting", "poc", "won"))
+        rows = base
+        if t == "pipeline":
+            rows = [r for r in rows if r["status"] in ("contacted", "meeting", "poc", "won")]
+        elif t == "hot":
+            rows = [r for r in rows if r["temperature"] == "hot"]
         # Stage first (your judgment), going-cold pinned within stage, then momentum.
         rows.sort(key=lambda r: (-tdb.STAGE_ORDER.get(r["status"], 1),
                                  0 if r["going_cold"] else 1,
                                  -r["_m"]))
-        pipeline_n = sum(1 for r in tdb.list_companies()
-                         if r["status"] in ("contacted", "meeting", "poc", "won"))
         return templates.TemplateResponse(request, "leads.html", {
             "rows": rows,
-            "counts": tdb.temperature_counts(),
+            "counts": counts,
             "pipeline_n": pipeline_n,
             "t": t,
             "active_tab": "leads",
@@ -292,12 +420,81 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
     async def targets_list_compat(request: Request, t: str = "all"):
         return RedirectResponse(f"/leads?t={t}")
 
+    # ─── Ingestion: bulk-import leads from an Excel sheet ───────────────
+    @app.get("/leads/import/template")
+    async def import_template():
+        return Response(
+            ingest.template_xlsx(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=foothold_leads_template.xlsx"})
+
+    @app.post("/leads/import")
+    async def import_leads(request: Request, file: UploadFile = File(...)):
+        pid = _active_pid(request)
+        role = request.state.user["role"]
+        owner = role if role in ("presales", "salesman") else "presales"
+        data = await file.read()
+        if not data:
+            return JSONResponse({"ok": False, "error": "Empty file."}, status_code=400)
+        res = ingest.parse_leads_xlsx(data, pid, owner_role=owner)
+        return JSONResponse(res)
+
+    # ─── Manager: switch workspace (managers only) ─────────────────────
+    @app.get("/workspace/{pid}")
+    async def switch_workspace(request: Request, pid: str):
+        u = request.state.user
+        if u and u["role"] == "manager" and tdb.get_project(pid):
+            resp = RedirectResponse("/team", status_code=303)
+            resp.set_cookie("foothold_active", pid,
+                            max_age=60 * 60 * 24 * 30, samesite="lax")
+            return resp
+        return RedirectResponse("/today", status_code=303)
+
+    # ─── Manager oversight: funnel · leakage · rep scorecard ───────────
+    @app.get("/team", response_class=HTMLResponse)
+    async def team_page(request: Request):
+        u = request.state.user
+        if u["role"] != "manager":
+            raise HTTPException(403, "Managers only.")
+        pid = _active_pid(request)
+        stages = ["new", "contacted", "meeting", "poc", "won"]
+        return templates.TemplateResponse(request, "team.html", {
+            "active_tab": "team",
+            "stages": stages,
+            "funnel": tdb.team_funnel(pid),
+            "leakage": tdb.team_leakage(pid),
+            "reps": tdb.rep_scorecard(pid),
+        })
+
+    # ─── Notifications inbox (marks read on view) ──────────────────────
+    @app.get("/inbox", response_class=HTMLResponse)
+    async def inbox_page(request: Request):
+        u = request.state.user
+        notifs = tdb.list_notifications(u["id"], limit=40)
+        tdb.mark_notifications_read(u["id"])
+        return templates.TemplateResponse(request, "inbox.html", {
+            "active_tab": "inbox",
+            "notifs": notifs,
+        })
+
     # ─── Calendar — month grid, click a day → tasks panel ─────────────
     @app.get("/calendar", response_class=HTMLResponse)
     async def calendar_page(request: Request, y: int = 0, m: int = 0):
         import calendar as _cal
         from datetime import timedelta as _td
         today = _date.today()
+
+        # Scope the agenda to the leads THIS user may see in the active
+        # workspace — otherwise every project's followups (e.g. Rohit's
+        # foothold leads) leak into a pre-sales rep's Plan tab.
+        _u = request.state.user
+        _pid = _active_pid(request)
+        _vis = tdb.visible_company_ids(_pid, _u["role"], _u["id"])
+        if _vis is None:  # manager: confine to the active workspace
+            _allowed = {c["id"] for c in tdb.list_companies(project_id=_pid)}
+        else:
+            _allowed = set(_vis)
+
         year  = y if 2000 <= y <= 2100 else today.year
         month = m if 1 <= m <= 12 else today.month
 
@@ -329,6 +526,7 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
             all_fu = [dict(r) for r in cur.fetchall()]
         finally:
             conn.close()
+        all_fu = [f for f in all_fu if f["company_id"] in _allowed]
 
         # Bucket by date.
         by_day: Dict[str, list] = {}
@@ -363,10 +561,12 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
 
         # ── Agenda groups (default view) ────────────────────────────
         view = request.query_params.get("view", "agenda")
-        overdue = tdb.list_followups_overdue(today.isoformat())
+        overdue = [f for f in tdb.list_followups_overdue(today.isoformat())
+                   if f["company_id"] in _allowed]
         horizon = today + _td(days=60)
-        upcoming = tdb.list_followups_window_all_status(
+        upcoming = [f for f in tdb.list_followups_window_all_status(
             today.isoformat(), horizon.isoformat())
+            if f["company_id"] in _allowed]
         tomorrow = today + _td(days=1)
         week_end = today + _td(days=6)
         groups = [
@@ -404,7 +604,8 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
             "today_iso":  today.isoformat(),
             "overdue": overdue,
             "agenda": groups,
-            "catalog": tdb.list_companies_catalog(),
+            "catalog": [c for c in tdb.list_companies_catalog()
+                        if c["id"] in _allowed],
             "year":  year,
             "month": month,
             "month_label": first.strftime("%B %Y"),
@@ -419,6 +620,16 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
         co = tdb.get_company(company_id)
         if not co:
             raise HTTPException(404, f"Company {company_id} not found")
+        # Workspace isolation: a user may only open leads in their own project
+        # (Phase 1 hid other workspaces from the lists; this enforces it on
+        # direct URLs too).
+        _u = getattr(request.state, "user", None)
+        if _u and _u["role"] != "manager":
+            if co.get("project_id") and co["project_id"] != _u["project_id"]:
+                raise HTTPException(404, f"Company {company_id} not found")
+            _vis = tdb.visible_company_ids(_u["project_id"], _u["role"], _u["id"])
+            if _vis is not None and company_id not in _vis:
+                raise HTTPException(404, f"Company {company_id} not found")
         # Two tabs (re-architecture): Memory = the living interaction thread,
         # Background = the reference dossier. We render BOTH panes in one load
         # and toggle client-side, so switching tabs is instant (no second
@@ -434,13 +645,34 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
         logs = tdb.list_research_logs(company_id)
         for r in logs:
             r["content_html"] = _render_md(r["content"])
+        _re = co.get("project_id") in tdb.REALESTATE_PROJECTS
+        _role = _u["role"] if _u else "manager"
         ctx = {
             "tab": tab,
             "active_tab": "leads",
             "STAGE_ORDER": tdb.STAGE_ORDER,
             "co": co,
+            # Real-estate workspaces relabel the two tabs (B2B keeps the defaults).
+            "tab_memory_label": "Lead Brain" if _re else "Memory",
+            "tab_background_label": "Profile" if _re else "Background",
+            "is_realestate": _re,
+            # Phase 3 — role-gated UI.
+            "user_role": _role,
+            "can_write": tdb.role_can(_role, "work"),
+            "can_status": tdb.role_can(_role, "status"),
+            "can_handoff": (tdb.role_can(_role, "handoff")
+                            and co.get("owner_role") == "presales"),
+            "can_share_broker": (_role == "salesman" and tdb.role_can(_role, "share")
+                                 and co.get("owner_role") == "salesman"),
+            "is_salesman": _role == "salesman",
             # Single-company score — no longer scans every company's history.
             "rk": tdb.lead_ranking_one(company_id),
+            # Intent-first: the content-driven signals behind the score.
+            "score_signals": tdb.list_score_signals(company_id, limit=8),
+            # P9: designated call numbers (multiple per lead) for the AI caller.
+            "lead_numbers": tdb.list_lead_numbers(company_id),
+            # P-A: recursive-learning spine — outcome + accumulated training data.
+            "train_stats": tdb.training_stats(),
             # Memory pane
             "suggestions": [{**s, "channel": _infer_channel(s.get("action", ""))}
                             for s in tdb.list_suggestions(company_id)],
@@ -477,11 +709,310 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
             raise HTTPException(400, "Invalid temperature or company.")
         return RedirectResponse(f"/targets/{company_id}", status_code=303)
 
-    # ─── Status change ─────────────────────────────────────────────────
+    # ─── Status change (logs a funnel event; won/lost → training example) ─
     @app.post("/targets/{company_id}/status")
     async def set_status(company_id: str, status: str = Form(...)):
-        if not tdb.update_status(company_id, status):
-            raise HTTPException(400, "Invalid status.")
+        if status in ("won", "lost"):
+            tdb.record_outcome(company_id, status)   # event + ML training snapshot
+        else:
+            if not tdb.update_status(company_id, status):
+                raise HTTPException(400, "Invalid status.")
+            tdb.log_event(company_id, f"stage:{status}")
+        return RedirectResponse(f"/targets/{company_id}", status_code=303)
+
+    # ─── Outcome / funnel event (P-A recursive-learning spine) ─────────
+    @app.post("/targets/{company_id}/outcome")
+    async def set_outcome(company_id: str, outcome: str = Form(...)):
+        if not tdb.get_company(company_id):
+            raise HTTPException(404, "Company not found")
+        if outcome in ("won", "lost"):
+            tid = tdb.record_outcome(company_id, outcome)   # snapshots features → label
+            return JSONResponse({"ok": True, "outcome": outcome, "training_example": tid})
+        tdb.log_event(company_id, outcome)                  # e.g. site_visit
+        return JSONResponse({"ok": True, "event": outcome})
+
+    # ─── Salesman: on-visit voice note → transcript → score (P4) ───────
+    @app.post("/targets/{company_id}/visit-capture")
+    async def visit_capture(company_id: str, audio: UploadFile = File(...)):
+        if not tdb.get_company(company_id):
+            raise HTTPException(404, "Company not found")
+        data = await audio.read()
+        if not data:
+            return JSONResponse({"error": "Empty recording."}, status_code=400)
+        txt = voice_agent.stt(data, filename=audio.filename or "visit.webm",
+                              mime=audio.content_type or "audio/webm")
+        if not (txt or "").strip():
+            return JSONResponse({"error": "Couldn’t transcribe — try again."}, status_code=200)
+        ing = tdb.ingest_capture(lead_id=company_id, channel="visit",
+                                 text=f"[site visit] {txt}", direction="out")
+        return JSONResponse({"transcript": txt, "signals": ing.get("signals", [])})
+
+    # ─── Salesman: CPaaS bridge-and-record call (non-AI) ───────────────
+    @app.post("/targets/{company_id}/call/bridge")
+    async def call_bridge(request: Request, company_id: str, phone: str = Form("")):
+        co = tdb.get_company(company_id)
+        if not co:
+            raise HTTPException(404, "Company not found")
+        buyer = (phone or co.get("dm_phone") or "").strip()
+        buyer_digits = "".join(c for c in buyer if c.isdigit())
+        salesman = (request.state.user.get("phone") or "").strip()
+        if not salesman:
+            return JSONResponse({"error": "Your profile has no phone for the bridge."}, status_code=400)
+        if not buyer_digits:
+            return JSONResponse({"error": "No buyer number on this lead."}, status_code=400)
+        sid, token, from_num = _twilio_cfg()
+        if not (sid and token and from_num):
+            return JSONResponse({"status": "stub",
+                "message": f"Bridge {salesman} → {buyer} is wired; add Twilio creds "
+                           "(and upgrade for non-verified buyers) to go live."})
+        base = _public_base()
+        try:
+            r = _requests.post(
+                f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json", auth=(sid, token),
+                data={"To": salesman, "From": from_num,
+                      "Url": f"{base}/voice/bridge/{company_id}?buyer={buyer_digits}",
+                      "StatusCallback": f"{base}/voice/status", "Method": "POST"}, timeout=15)
+            if r.status_code >= 300:
+                return JSONResponse({"error": f"Twilio {r.status_code}", "detail": r.text[:150]}, status_code=502)
+            return JSONResponse({"status": "bridging",
+                "message": f"Calling you ({salesman})… pick up and you’ll be connected to the buyer. Recorded + transcribed."})
+        except Exception as e:  # noqa: BLE001
+            return JSONResponse({"error": str(e)[:150]}, status_code=502)
+
+    @app.post("/voice/bridge/{company_id}")
+    async def voice_bridge(request: Request, company_id: str, buyer: str = ""):
+        base = _public_base()
+        digits = "".join(c for c in buyer if c.isdigit())
+        return _twiml(
+            '<Say language="hi-IN">कॉल कनेक्ट हो रही है, यह रिकॉर्ड की जा रही है।</Say>'
+            f'<Dial record="record-from-answer" '
+            f'recordingStatusCallback="{base}/voice/recording?lead={company_id}" '
+            f'recordingStatusCallbackEvent="completed"><Number>+{digits}</Number></Dial>')
+
+    @app.post("/voice/recording")
+    async def voice_recording(request: Request, lead: str = ""):
+        form = await request.form()
+        rec_url = form.get("RecordingUrl", "")
+        if rec_url and lead:
+            try:
+                sid, token, _ = _twilio_cfg()
+                ar = _requests.get(rec_url + ".wav", auth=(sid, token), timeout=25)
+                if ar.status_code == 200 and ar.content:
+                    txt = voice_agent.stt(ar.content, filename="bridge.wav")
+                    if txt:
+                        tdb.ingest_capture(lead_id=lead, channel="call",
+                                           text=f"[bridge call] {txt}", direction="out")
+            except Exception:  # noqa: BLE001
+                pass
+        return PlainTextResponse("ok")
+
+    # ─── Pre-sales AI actions: draft WhatsApp · fix grammar · brochures ─
+    @app.post("/targets/{company_id}/ai/draft-wa")
+    async def ai_draft_wa(company_id: str):
+        if not tdb.get_company(company_id):
+            raise HTTPException(404, "Company not found")
+        return JSONResponse({"text": ai_actions.draft_whatsapp(company_id)})
+
+    @app.post("/ai/grammar")
+    async def ai_grammar(text: str = Form("")):
+        return JSONResponse({"text": ai_actions.fix_grammar(text)})
+
+    @app.get("/api/brochures")
+    async def api_brochures(request: Request):
+        return JSONResponse(ai_actions.list_brochures(_active_pid(request)))
+
+    # ─── Move feedback: which recommendation the salesman acted on ──────
+    @app.post("/api/moves/feedback")
+    async def move_feedback(company_id: str = Form(...), suggestion_id: int = Form(0),
+                            action: str = Form(""), taken: int = Form(1), worked: int = Form(-1)):
+        tdb.log_move_feedback(company_id, suggestion_id or None, action,
+                              taken, None if worked == -1 else worked)
+        return JSONResponse({"ok": True})
+
+    # ─── AI voice calling (Twilio + Sarvam Indian-language agent) ──────
+    def _public_base() -> str:
+        return (_os_voice.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+                or "https://foothold-yantrai.fly.dev")
+
+    def _twilio_cfg():
+        return (_os_voice.environ.get("TWILIO_ACCOUNT_SID", "").strip(),
+                _os_voice.environ.get("TWILIO_AUTH_TOKEN", "").strip(),
+                _os_voice.environ.get("TWILIO_NUMBER", "").strip())
+
+    @app.post("/targets/{company_id}/call/start")
+    async def call_start(request: Request, company_id: str, phone: str = Form("")):
+        """Place a real AI call to the buyer via Twilio. `phone` picks one of the
+        lead's designated numbers; otherwise the primary dm_phone. The Hindi AI
+        conversation's transcript flows back to the Lead Brain + drives the score.
+        Gracefully degrades to a stub if Twilio creds aren't configured."""
+        co = tdb.get_company(company_id)
+        if not co:
+            raise HTTPException(404, "Company not found")
+        phone = (phone or "").strip() or (co.get("dm_phone") or co.get("dm_whatsapp") or "").strip()
+        if not phone:
+            return JSONResponse({"error": "No phone number on this lead."}, status_code=400)
+        sid, token, from_num = _twilio_cfg()
+        if not (sid and token and from_num):
+            return JSONResponse({
+                "status": "stub", "to": phone,
+                "message": (f"AI call to {co.get('dm_name') or co['name']} is wired but "
+                            "Twilio creds aren’t set. Add TWILIO_ACCOUNT_SID / "
+                            "TWILIO_AUTH_TOKEN / TWILIO_NUMBER to go live."),
+            })
+        base = _public_base()
+        try:
+            r = _requests.post(
+                f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json",
+                auth=(sid, token),
+                data={
+                    "To": phone, "From": from_num,
+                    "Url": f"{base}/voice/twiml/{company_id}",
+                    "Method": "POST",
+                    "StatusCallback": f"{base}/voice/status",
+                    "StatusCallbackEvent": "completed",
+                    "StatusCallbackMethod": "POST",
+                    "Record": "false",
+                },
+                timeout=15,
+            )
+            if r.status_code >= 300:
+                return JSONResponse({"error": f"Twilio error {r.status_code}",
+                                     "detail": r.text[:200]}, status_code=502)
+            call_sid = r.json().get("sid", "")
+            return JSONResponse({"status": "calling", "to": phone, "call_sid": call_sid,
+                                 "message": f"Calling {co.get('dm_name') or co['name']}… "
+                                            "AI agent (Hindi) is on the line."})
+        except Exception as e:  # noqa: BLE001
+            return JSONResponse({"error": "Could not place the call.",
+                                 "detail": str(e)[:200]}, status_code=502)
+
+    # ─── Designated call numbers on a lead (add / delete) ──────────────
+    @app.post("/targets/{company_id}/numbers")
+    async def add_number(company_id: str, phone: str = Form(...), label: str = Form("")):
+        if not tdb.get_company(company_id):
+            raise HTTPException(404, "Company not found")
+        if not phone.strip():
+            return JSONResponse({"error": "Phone required."}, status_code=400)
+        nid = tdb.add_lead_number(company_id, phone, label)
+        return RedirectResponse(f"/targets/{company_id}#numbers", status_code=303)
+
+    @app.post("/api/numbers/{num_id}/delete")
+    async def delete_number(num_id: int):
+        tdb.delete_lead_number(num_id)
+        return JSONResponse({"ok": True})
+
+    # ─── Score-signal ✓/✗ curation (adaptive Way 2) ────────────────────
+    @app.post("/api/signals/{signal_id}/toggle")
+    async def toggle_signal(signal_id: int):
+        new_active = tdb.toggle_score_signal(signal_id)
+        if new_active is None:
+            raise HTTPException(404, "Signal not found")
+        tdb.bust_cache()   # score recomputes with the signal in/out
+        return JSONResponse({"active": new_active})
+
+    def _twiml(inner: str) -> Response:
+        return Response(f'<?xml version="1.0" encoding="UTF-8"?><Response>{inner}</Response>',
+                        media_type="application/xml")
+
+    def _record_verb() -> str:
+        base = _public_base()
+        return (f'<Record action="{base}/voice/turn" method="POST" '
+                f'maxLength="30" timeout="4" playBeep="false" '
+                f'trim="trim-silence" recordingStatusCallback=""/>')
+
+    @app.post("/voice/twiml/{company_id}")
+    async def voice_twiml(request: Request, company_id: str):
+        """First webhook Twilio hits after the buyer answers: greet + record."""
+        form = await request.form()
+        call_sid = form.get("CallSid", "")
+        co = tdb.get_company(company_id)
+        if not co or not call_sid:
+            return _twiml("<Say>Sorry, something went wrong.</Say><Hangup/>")
+        voice_agent.start_call_state(call_sid, co)
+        opener_text = voice_agent.opener(co)      # fixed greeting: "हैलो <name>, मैं रोहित…"
+        voice_agent.record_turn(call_sid, "", opener_text)
+        wav = voice_agent.tts(opener_text)
+        if wav:
+            tok = voice_agent.stash_audio(wav)
+            play = f'<Play>{_public_base()}/voice/audio/{tok}.wav</Play>'
+        else:
+            play = f'<Say language="hi-IN">{opener_text}</Say>'
+        return _twiml(play + _record_verb())
+
+    @app.post("/voice/turn")
+    async def voice_turn(request: Request):
+        """Each buyer turn: transcribe → LLM reply → speak → record next."""
+        form = await request.form()
+        call_sid = form.get("CallSid", "")
+        rec_url = form.get("RecordingUrl", "")
+        call = voice_agent.get_call(call_sid)
+        if not call:
+            return _twiml("<Hangup/>")
+        # Transcribe the buyer's recording (Twilio recording needs Twilio auth).
+        user_text = ""
+        if rec_url:
+            try:
+                sid, token, _ = _twilio_cfg()
+                ar = _requests.get(rec_url + ".wav", auth=(sid, token), timeout=15)
+                if ar.status_code == 200 and ar.content:
+                    user_text = voice_agent.stt(ar.content, filename="turn.wav")
+            except Exception:  # noqa: BLE001
+                user_text = ""
+        reply, end = voice_agent.sales_reply(call["lead"], call["history"], user_text)
+        voice_agent.record_turn(call_sid, user_text, reply)
+        if call["turns"] >= voice_agent.MAX_TURNS:
+            end = True
+        wav = voice_agent.tts(reply, lang=call["lang"])
+        if wav:
+            tok = voice_agent.stash_audio(wav)
+            play = f'<Play>{_public_base()}/voice/audio/{tok}.wav</Play>'
+        else:
+            play = f'<Say language="hi-IN">{reply}</Say>'
+        return _twiml(play + ("<Hangup/>" if end else _record_verb()))
+
+    @app.get("/voice/audio/{token}")
+    async def voice_audio(token: str):
+        wav = voice_agent.take_audio(token.replace(".wav", ""))
+        if not wav:
+            raise HTTPException(404, "expired")
+        return Response(wav, media_type="audio/wav")
+
+    @app.post("/voice/status")
+    async def voice_status(request: Request):
+        """Call ended → push the full transcript into the capture spine so it
+        lands on the Lead Brain, moves the score, and notifies the owner."""
+        form = await request.form()
+        call_sid = form.get("CallSid", "")
+        status = form.get("CallStatus", "")
+        call = voice_agent.get_call(call_sid)
+        if call and status in ("completed", "busy", "no-answer", "failed", "canceled"):
+            transcript = voice_agent.full_transcript(call_sid)
+            lead = call["lead"]
+            body = transcript or f"AI call — {status}"
+            try:
+                tdb.ingest_capture(lead_id=lead["id"], channel="call",
+                                   text=f"[AI call] {body}", direction="out")
+            except Exception:  # noqa: BLE001
+                pass
+            voice_agent.end_call_state(call_sid)
+        return PlainTextResponse("ok")
+
+    # ─── Share: pre-sales → salesman (role-gated in middleware) ────────
+    @app.post("/targets/{company_id}/handoff")
+    async def handoff(company_id: str, summary: str = Form("")):
+        if not tdb.share_to_salesman(company_id, summary):
+            return JSONResponse({"error": "This lead can’t be shared."},
+                                status_code=400)
+        # It now belongs to the salesman and leaves the pre-sales view.
+        return RedirectResponse("/leads", status_code=303)
+
+    # ─── Share: salesman → broker (lead stays with salesman, broker tagged) ─
+    @app.post("/targets/{company_id}/share-broker")
+    async def share_broker(company_id: str, broker_id: str = Form("broker"),
+                           summary: str = Form("")):
+        if not tdb.share_to_broker(company_id, broker_id, summary):
+            return JSONResponse({"error": "Could not share with broker."},
+                                status_code=400)
         return RedirectResponse(f"/targets/{company_id}", status_code=303)
 
     # ─── Notes ─────────────────────────────────────────────────────────
@@ -979,6 +1510,19 @@ border:0;background:#161514;color:#fff;cursor:pointer;}
     @app.get("/search", response_class=HTMLResponse)
     async def search_page(request: Request, q: str = ""):
         results = tdb.search_all(q) if q.strip() else None
+        # Scope results to the leads THIS user may see (broker → only tagged
+        # leads; others → their workspace slice). Prevents cross-lead leakage.
+        if results:
+            u = request.state.user
+            pid = _active_pid(request)
+            vis = tdb.visible_company_ids(pid, u["role"], u["id"])
+            if vis is None:   # manager: confine to the active workspace
+                allowed = {c["id"] for c in tdb.list_companies(project_id=pid)}
+            else:
+                allowed = set(vis)
+            for k in list(results.keys()):
+                results[k] = [it for it in results[k]
+                              if (it.get("id") or it.get("company_id")) in allowed]
         # Compute total count and trim long snippets in research results.
         total = 0
         if results:

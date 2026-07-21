@@ -1,0 +1,74 @@
+{% extends "app_base.html" %}
+{% block title %}Foothold · Team{% endblock %}
+{% block style %}
+.team-h { font-size:19px; font-weight:800; margin:16px 0 4px; }
+.team-sub { color:var(--ink3); font-size:12.5px; margin-bottom:16px; }
+.tcard { background:var(--card); border:1px solid var(--rule); border-radius:14px; padding:14px 16px; margin-bottom:14px; }
+.tcard h3 { font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3); margin:0 0 12px; }
+.funnel { display:grid; grid-template-columns:78px repeat(5,1fr); gap:5px; font-size:12px; align-items:center; }
+.funnel .hd { font-weight:800; color:var(--ink3); font-size:9.5px; text-transform:uppercase; text-align:center; }
+.funnel .rl { font-weight:800; font-size:11.5px; }
+.funnel .cell { text-align:center; padding:9px 0; border-radius:8px; background:#f4efe9; font-weight:800; }
+.funnel .cell.z { color:#c8c2ba; font-weight:400; }
+.leak-item { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--rule); }
+.leak-item:first-child { border-top:0; }
+.leak-badge { font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px; background:#fde8e8; color:#b3261e; white-space:nowrap; }
+.leak-item a { font-weight:700; color:var(--ink); text-decoration:none; }
+.leak-empty, .rep-empty { color:var(--ink3); font-size:13px; }
+.rep { display:flex; align-items:center; gap:10px; padding:11px 0; border-top:1px solid var(--rule); }
+.rep:first-child { border-top:0; }
+.rep .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+.rep .dot.on { background:#1a7f47; } .rep .dot.off { background:#d9d4cd; }
+.rep .nm { font-weight:700; flex:1; font-size:13.5px; }
+.rep .role { font-size:9px; text-transform:uppercase; font-weight:800; color:var(--ink3); margin-left:4px; }
+.rep .stat { font-size:11.5px; color:var(--ink2); text-align:right; white-space:nowrap; }
+.rep .stat b { color:var(--ink); }
+{% endblock %}
+{% block content %}
+<div class="team-h">Team · {{ active_project.name }}</div>
+<div class="team-sub">Pipeline health, where leads leak, and who’s working.</div>
+
+<div class="tcard">
+  <h3>Pipeline funnel — by tier</h3>
+  <div class="funnel">
+    <div class="hd"></div>
+    {% for s in stages %}<div class="hd">{{ s }}</div>{% endfor %}
+    {% for role in ['presales', 'ground'] %}
+    <div class="rl">{{ 'Pre-sales' if role == 'presales' else 'Ground' }}</div>
+    {% for s in stages %}
+      {% set n = funnel.get(role, {}).get(s, 0) %}
+      <div class="cell {% if not n %}z{% endif %}">{{ n }}</div>
+    {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+
+<div class="tcard">
+  <h3>⚠ Where leads are leaking</h3>
+  {% if leakage %}
+    {% for l in leakage %}
+    <div class="leak-item">
+      <span class="leak-badge">{{ l.days }}d</span>
+      <div><a href="/leads/{{ l.id }}">{{ l.name }}</a> — <span style="color:var(--ink2)">{{ l.reason }}</span></div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="leak-empty">✓ Nothing leaking — every lead touched recently.</div>
+  {% endif %}
+</div>
+
+<div class="tcard">
+  <h3>Rep scorecard — last 7 days</h3>
+  {% if reps %}
+    {% for r in reps %}
+    <div class="rep">
+      <span class="dot {{ 'on' if r.worked_today else 'off' }}" title="{{ 'Worked today' if r.worked_today else 'No activity today' }}"></span>
+      <span class="nm">{{ r.name }}<span class="role">{{ r.role }}</span></span>
+      <span class="stat"><b>{{ r.touches }}</b> touches · <b>{{ r.leads }}</b> leads · <b>{{ r.open_followups }}</b> open</span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="rep-empty">No reps in this workspace.</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "app_base.html" %}
+{% block title %}Foothold · Inbox{% endblock %}
+{% block style %}
+.inbox-h { font-size:19px; font-weight:800; margin:16px 0 12px; }
+.nt { display:block; text-decoration:none; color:inherit; background:var(--card);
+  border:1px solid var(--rule); border-radius:12px; padding:12px 14px; margin-bottom:8px; }
+.nt.unread { border-left:3px solid var(--amber); }
+.nt .tx { font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.4; }
+.nt .mt { font-size:11px; color:var(--ink3); margin-top:4px; }
+.inbox-empty { color:var(--ink3); font-size:13px; margin-top:24px; text-align:center; }
+{% endblock %}
+{% block content %}
+<div class="inbox-h">🔔 Inbox</div>
+{% if notifs %}
+  {% for n in notifs %}
+  <a class="nt {% if not n.read %}unread{% endif %}" href="{{ n.link or '#' }}">
+    <div class="tx">{{ n.text }}</div>
+    <div class="mt">{{ n.ts[:16].replace('T', ' · ') }}</div>
+  </a>
+  {% endfor %}
+{% else %}
+  <div class="inbox-empty">No notifications yet.</div>
+{% endif %}
+{% endblock %}

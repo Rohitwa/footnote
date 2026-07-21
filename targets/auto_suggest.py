@@ -52,6 +52,45 @@ Return ONLY a JSON object, no prose:
 Exactly 1-3 moves, ordered by priority."""
 
 
+# Real-estate buyer doctrine — used for RE workspaces (project in
+# REALESTATE_PROJECTS) instead of the B2B YantrAI playbook above.
+RE_PROMPT = """\
+You are Rohit, a warm real-estate pre-sales rep for Aralia One (luxury 3 & 4 BHK,
+Golf Course Extension Road, Gurgaon; ₹4.2–7.5 Cr; possession Dec 2028; RERA-reg).
+Below is ONE BUYER. Propose the single best next move to advance THIS buyer.
+
+DOCTRINE (non-negotiable):
+- Funnel: enquiry → site visit → booking (token/EOI) → agreement → registration.
+  Every move pushes the buyer to the NEXT stage.
+- THE VISIT IS THE CLOSE. When a buyer shows booking intent + is ready, the SINGLE
+  best move is a VISIT-TO-CLOSE: invite them to see the EXACT flat/config they want
+  (name it, e.g. the 3 BHK) and CLOSE the booking during that visit — not a generic
+  "schedule a visit", and not a form sent cold. The on-site meeting is where the
+  deal closes.
+- REACT to the buyer's latest message + BANT intent signals:
+  · Booking intent + wants a visit → invite to view the desired flat and close on-site.
+  · Budget + timeline confirmed but no visit → drive the visit to the specific config.
+  · Competitor named / going cold → re-engage referencing what THEY said; address the objection.
+- Be channel-specific (WhatsApp / call), name the buyer, one clear action each.
+- NEVER suggest internal research or document-polishing. Do not invent prices or
+  offers beyond the project facts.
+
+CONTEXT:
+{context}
+
+Return ONLY a JSON object, no prose:
+{{"moves": [
+  {{"action": "imperative; names the buyer + channel; <=140 chars",
+    "why": "evidence from the buyer's signals/messages, <=200 chars",
+    "generates": "the funnel event this produces (e.g. 'booking closed at visit'), <=80 chars",
+    "due_in_days": 0}}
+]}}
+Return 1 OR 2 moves (best first), so the salesman can choose. Give a 2nd move ONLY
+if it is a genuinely DIFFERENT option (different channel — a call vs a WhatsApp — or
+a different approach). If one move is clearly best, return just that ONE — never two
+phrasings of the same action."""
+
+
 def build_context(company_id: str) -> str:
     co = tdb.get_company(company_id)
     rk = tdb.lead_rankings().get(company_id, {})
@@ -66,6 +105,15 @@ def build_context(company_id: str) -> str:
         lines.append(f"THEIR PROBLEM (the leak): {co['leak'][:300]}")
     if co.get("lever"):
         lines.append(f"OUR ANGLE (the door): {co['lever'][:300]}")
+
+    # Intent-first BANT signals — the real read on where the lead stands.
+    sigs = [s for s in tdb.list_score_signals(company_id, limit=10)
+            if s.get("active", 1)]
+    if sigs:
+        lines.append(f"BUYER INTENT SIGNALS (score {rk.get('score', '—')}/100):")
+        for s in sigs:
+            lines.append(f"  - {s['label']} [{s.get('category') or '—'} {s['delta']:+d}]"
+                         f" — {(s.get('reason') or '')[:90]}")
 
     arts = tdb.list_artifacts(company_id)
     if arts:
@@ -102,15 +150,17 @@ def build_context(company_id: str) -> str:
     return "\n".join(lines)
 
 
-def _run_openai(context: str) -> Dict[str, Any]:
-    """Next-move reasoning via OpenAI gpt-4o-mini (JSON mode). Fast (~2-3s),
-    always available (no headless-Claude session limit), and runs on Fly too —
-    so 'Recommend the next move' works on the deployed app, not just the Mac."""
+def _run_openai(context: str, re: bool = False) -> Dict[str, Any]:
+    """Next-move reasoning via OpenAI gpt-4o-mini (JSON mode). `re` switches to
+    the real-estate buyer doctrine (RE workspaces) vs the B2B YantrAI playbook."""
     import os
     import requests
     key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("OPENAI_API_KEY missing in environment.")
+    prompt = RE_PROMPT if re else PROMPT
+    system = ("You are Rohit, a real-estate pre-sales rep. Return ONLY a JSON object."
+              if re else "You are a B2B sales co-pilot. Return ONLY a JSON object.")
     try:
         resp = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -120,8 +170,8 @@ def _run_openai(context: str) -> Dict[str, Any]:
                 "temperature": 0.2,
                 "response_format": {"type": "json_object"},
                 "messages": [
-                    {"role": "system", "content": "You are a B2B sales co-pilot. Return ONLY a JSON object."},
-                    {"role": "user", "content": PROMPT.format(context=context)},
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt.format(context=context)},
                 ],
             },
             timeout=30,
@@ -139,7 +189,8 @@ def run_suggest(company_id: str) -> Dict[str, Any]:
         return {"ok": False, "error": "company not found"}
     tdb.set_suggest_status(company_id, "running")
     try:
-        data = _run_openai(build_context(company_id))
+        re = co.get("project_id") in getattr(tdb, "REALESTATE_PROJECTS", set())
+        data = _run_openai(build_context(company_id), re=re)
         moves = data.get("moves") or []
         n = tdb.replace_suggestions(company_id, moves)
         tdb.set_suggest_status(company_id, "done")
